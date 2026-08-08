@@ -11,6 +11,7 @@
   let originalDocumentTitle = document.title;
   let currentJobTitle = 'Unknown Role';
   let currentCompany = 'Unknown Company';
+  let _dropdownInjected = false; // hard one-shot guard — prevents MutationObserver loop
 
   // Load user profile from chrome.storage.local
   function loadProfile(callback) {
@@ -711,6 +712,10 @@
    * Does NOT auto-submit or simulate Enter — the user clicks Search manually.
    */
   function injectRoleSearchDropdown() {
+    // Hard one-shot guard: prevents MutationObserver or any repeated caller
+    // from re-running this and causing a DOM mutation → observer → inject loop.
+    if (_dropdownInjected) return;
+
     // Only run on naukri.com
     const hostname = (typeof window !== 'undefined' && window.location) ? (window.location.hostname || '') : '';
     const isNaukri = window.SpeedFillMatcher?.isNaukriPage
@@ -718,12 +723,15 @@
       : (hostname && hostname.includes('naukri.com'));
     if (!isNaukri) return;
 
-    // If dropdown already exists, just refresh its options in case profile changed
-    const existing = document.getElementById('naukri-role-search-dropdown');
-    if (existing) {
-      _populateDropdownOptions(existing);
+    // Secondary DOM guard: belt-and-suspenders in case flag somehow bypassed
+    if (document.getElementById('naukri-role-search-wrapper') ||
+        document.getElementById('naukri-role-search-dropdown')) {
+      _dropdownInjected = true;
       return;
     }
+
+    // Mark as injected BEFORE any DOM work so re-entrant calls bail immediately
+    _dropdownInjected = true;
 
     // --- Build wrapper ---
     const wrapper = document.createElement('div');
@@ -862,7 +870,11 @@
       }
 
       if (shouldFill) {
-        injectRoleSearchDropdown();
+        // NOTE: Do NOT call injectRoleSearchDropdown() here.
+        // Injecting a DOM node from inside a MutationObserver that watches
+        // childList/subtree causes the observer to fire again immediately,
+        // creating an infinite mutation → inject → mutation loop that
+        // freezes the main thread. The dropdown is mounted once at init time.
         clearTimeout(window._speedfillTimer);
         window._speedfillTimer = setTimeout(() => {
           if (userProfile?.settings?.autoFillOnLoad !== false) {
@@ -970,8 +982,14 @@
   loadProfile(() => {
     setupDOMObserver();
     createFloatingPill();
-    injectRoleSearchDropdown();
-    // Refresh dropdown options whenever profile is updated
+
+    // Inject dropdown exactly ONCE via a safe deferred timeout.
+    // This runs after the current call stack clears, ensuring the DOM
+    // observer is already active but the injection itself is outside
+    // any observer callback — eliminating the mutation loop.
+    setTimeout(injectRoleSearchDropdown, 0);
+
+    // Refresh dropdown options in real-time when user updates profile in popup
     chrome.storage.onChanged.addListener((changes, ns) => {
       if (ns === 'local' && changes.userProfile) {
         const sel = document.getElementById('naukri-role-search-dropdown');
