@@ -862,7 +862,7 @@
       }
 
       if (shouldFill) {
-        injectSearchFillButton();
+        injectRoleSearchDropdown();
         clearTimeout(window._speedfillTimer);
         window._speedfillTimer = setTimeout(() => {
           if (userProfile?.settings?.autoFillOnLoad !== false) {
