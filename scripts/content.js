@@ -704,144 +704,146 @@
   }
 
   /**
-   * Inject or remove the "Search Fill" button based on domain and search bar presence
+   * Inject a floating role-selector dropdown in the bottom-right corner.
+   * Reads targetRole.jobTitle (comma-separated) from the user profile,
+   * splits it into individual options, and on selection fills Naukri's
+   * search keyword input using React-compatible native setter + events.
+   * Does NOT auto-submit or simulate Enter — the user clicks Search manually.
    */
-  function injectSearchFillButton() {
+  function injectRoleSearchDropdown() {
+    // Only run on naukri.com
     const hostname = (typeof window !== 'undefined' && window.location) ? (window.location.hostname || '') : '';
     const isNaukri = window.SpeedFillMatcher?.isNaukriPage
       ? window.SpeedFillMatcher.isNaukriPage(hostname)
       : (hostname && hostname.includes('naukri.com'));
+    if (!isNaukri) return;
 
-    // Restrict injection strictly to naukri.com pages
-    if (!isNaukri) {
-      removeSearchFillButton();
-      return null;
+    // If dropdown already exists, just refresh its options in case profile changed
+    const existing = document.getElementById('naukri-role-search-dropdown');
+    if (existing) {
+      _populateDropdownOptions(existing);
+      return;
     }
 
-    // Find search bar container
-    const searchContainer = window.SpeedFillMatcher?.findSearchContainer
-      ? window.SpeedFillMatcher.findSearchContainer(document)
-      : document.querySelector('form[name="searchForm"], .nMainNavbar, .search-box, .qsbWrapper');
+    // --- Build wrapper ---
+    const wrapper = document.createElement('div');
+    wrapper.id = 'naukri-role-search-wrapper';
+    wrapper.setAttribute('aria-label', 'SpeedFill Quick Role Search');
 
-    // If search bar container is absent in DOM, remove/hide injected button
-    if (!searchContainer) {
-      removeSearchFillButton();
-      return null;
-    }
+    // --- Build <select> ---
+    const select = document.createElement('select');
+    select.id = 'naukri-role-search-dropdown';
+    select.className = 'naukri-role-search-dropdown';
+    select.setAttribute('aria-label', 'Select role to search on Naukri');
 
-    // Check if button already exists
-    let existingBtn = document.getElementById('naukri-search-fill-btn');
-    if (existingBtn) {
-      if (!searchContainer.contains(existingBtn) && existingBtn.parentElement !== searchContainer.parentElement) {
-        positionSearchFillButton(existingBtn, searchContainer);
+    // Placeholder option
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = '\uD83D\uDE80 Select Role to Search...';
+    placeholder.disabled = true;
+    placeholder.selected = true;
+    select.appendChild(placeholder);
+
+    // Populate role options from profile
+    _populateDropdownOptions(select);
+
+    // --- onChange handler: fill Naukri search bar ---
+    select.addEventListener('change', (e) => {
+      const chosenRole = e.target.value;
+      if (!chosenRole) return;
+
+      // Find Naukri's keyword search input
+      const keywordInput =
+        document.querySelector('input[placeholder*="Search jobs here"]') ||
+        document.querySelector('#qsb-keys-sug') ||
+        document.querySelector('input[name="qp"]') ||
+        document.querySelector('input[placeholder*="search"]');
+
+      if (!keywordInput) {
+        console.warn('[Naukri SpeedFill] Could not find search input to fill.');
+        return;
       }
-      return existingBtn;
-    }
 
-    // Create new button element
-    const btn = document.createElement('button');
-    btn.id = 'naukri-search-fill-btn';
-    btn.className = 'naukri-search-fill-btn';
-    btn.type = 'button';
-    btn.setAttribute('aria-label', 'Search Fill');
+      // Use native React setter so React state syncs correctly
+      const nativeSetter = Object.getOwnPropertyDescriptor(
+        window.HTMLInputElement.prototype, 'value'
+      )?.set;
 
-    // Naukri search icon SVG inline + text
-    btn.innerHTML = `<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg><span>Search Fill</span>`;
+      if (nativeSetter) {
+        nativeSetter.call(keywordInput, chosenRole);
+      } else {
+        keywordInput.value = chosenRole;
+      }
 
-    btn.addEventListener('click', handleSearchFillClick);
+      // Dispatch React-compatible events (no Enter / submit)
+      keywordInput.dispatchEvent(new Event('input',  { bubbles: true }));
+      keywordInput.dispatchEvent(new Event('change', { bubbles: true }));
 
-    positionSearchFillButton(btn, searchContainer);
-    return btn;
-  }
+      // Visual glow feedback on the search input
+      keywordInput.classList.add('speedfill-highlight');
+      setTimeout(() => keywordInput.classList.remove('speedfill-highlight'), 2000);
 
-  function positionSearchFillButton(btn, searchContainer) {
-    if (!btn || !searchContainer) return;
-    
-    // Place button directly after keyword input / search button inside search container
-    const keyInput = searchContainer.querySelector('#qsb-keys-sug') || searchContainer;
-    if (keyInput && keyInput.parentElement && keyInput !== searchContainer) {
-      const qsbForm = searchContainer.querySelector('.qsb-btn, button[type="submit"]') || keyInput.parentElement;
-      qsbForm.insertAdjacentElement('afterend', btn);
-    } else {
-      searchContainer.insertAdjacentElement('afterend', btn);
-    }
+      // Flash wrapper to confirm selection
+      wrapper.classList.add('naukri-role-search-wrapper--active');
+      setTimeout(() => wrapper.classList.remove('naukri-role-search-wrapper--active'), 600);
 
-    // Encourage horizontal alignment if parent is flex/inline-flex
-    const parentStyle = searchContainer.parentElement ? window.getComputedStyle(searchContainer.parentElement) : null;
-    if (searchContainer.parentElement && !(parentStyle?.display === 'flex' || parentStyle?.display === 'inline-flex')) {
-      searchContainer.parentElement.style.display = 'flex';
-      searchContainer.parentElement.style.alignItems = 'center';
-      searchContainer.parentElement.style.gap = '8px';
-    }
-  }
+      // Reset dropdown back to placeholder so it looks clean for next use
+      setTimeout(() => { select.value = ''; }, 800);
 
-  function removeSearchFillButton() {
-    const existingBtn = document.getElementById('naukri-search-fill-btn');
-    if (existingBtn && existingBtn.parentNode) {
-      existingBtn.parentNode.removeChild(existingBtn);
-    }
+      console.log(`[Naukri SpeedFill] Search field filled with role: "${chosenRole}"`);
+    });
+
+    wrapper.appendChild(select);
+    document.body.appendChild(wrapper);
+    console.log('[Naukri SpeedFill] Role search dropdown injected.');
   }
 
   /**
-   * Handle Search Fill button click: read chrome.storage.local userProfile, extract target values, set inputs, dispatch React/DOM events
+   * Populate (or refresh) the role options inside the dropdown from the user profile.
+   * Reads targetRole.jobTitle as a comma-separated string and creates one <option> per role.
    */
-  function handleSearchFillClick(e) {
-    if (e) {
-      if (typeof e.preventDefault === 'function') e.preventDefault();
-      if (typeof e.stopPropagation === 'function') e.stopPropagation();
+  function _populateDropdownOptions(selectEl) {
+    // Remove all non-placeholder options first (index > 0)
+    while (selectEl.options.length > 1) {
+      selectEl.remove(1);
     }
 
-    if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-      chrome.storage.local.get(null, (result) => {
-        const profile = (result && result.userProfile) ? result.userProfile : (result || userProfile);
-        executeSearchFill(profile);
-      });
-    } else {
-      executeSearchFill(userProfile);
+    const profile = userProfile;
+    const rawRoles =
+      profile?.work?.targetRole?.jobTitle ||
+      profile?.work?.currentRole?.jobTitle ||
+      '';
+
+    const roles = String(rawRoles)
+      .split(',')
+      .map(r => r.trim())
+      .filter(r => r.length > 0);
+
+    if (roles.length === 0) {
+      const fallback = document.createElement('option');
+      fallback.value = '';
+      fallback.disabled = true;
+      fallback.textContent = '⚠\uFE0F No roles in profile';
+      selectEl.appendChild(fallback);
+      return;
     }
+
+    roles.forEach(role => {
+      const opt = document.createElement('option');
+      opt.value = role;
+      opt.textContent = role;
+      selectEl.appendChild(opt);
+    });
   }
 
   /**
-   * Execute search fill using extracted profile data and native setters
+   * Remove the floating role dropdown (cleanup helper)
    */
-  function executeSearchFill(profile) {
-    const activeProfile = profile || userProfile;
-    const { keywords, location } = window.SpeedFillMatcher?.extractSearchFillData
-      ? window.SpeedFillMatcher.extractSearchFillData(activeProfile)
-      : {
-          keywords: activeProfile?.work?.targetRole?.jobTitle || activeProfile?.work?.currentRole?.jobTitle || activeProfile?.work?.targetRole?.keySkills || '',
-          location: activeProfile?.work?.targetRole?.targetLocation || activeProfile?.personal?.city || ''
-        };
-
-    const { keywordInput, locationInput } = window.SpeedFillMatcher?.getSearchInputs
-      ? window.SpeedFillMatcher.getSearchInputs(document)
-      : {
-          keywordInput: document.querySelector('#qsb-keys-sug, input[name="qp"]'),
-          locationInput: document.querySelector('#qsb-location-sug, input[name="ql"]')
-        };
-
-    let filledCount = 0;
-
-    if (keywordInput && keywords) {
-      if (window.SpeedFillMatcher?.setNativeInputValue) {
-        window.SpeedFillMatcher.setNativeInputValue(keywordInput, keywords);
-      } else {
-        setReactInputValue(keywordInput, keywords);
-      }
-      filledCount++;
+  function removeRoleSearchDropdown() {
+    const wrapper = document.getElementById('naukri-role-search-wrapper');
+    if (wrapper && wrapper.parentNode) {
+      wrapper.parentNode.removeChild(wrapper);
     }
-
-    if (locationInput && location) {
-      if (window.SpeedFillMatcher?.setNativeInputValue) {
-        window.SpeedFillMatcher.setNativeInputValue(locationInput, location);
-      } else {
-        setReactInputValue(locationInput, location);
-      }
-      filledCount++;
-    }
-
-    console.log(`[Naukri SpeedFill] Search Fill executed: ${filledCount} field(s) filled. Keywords="${keywords}", Location="${location}"`);
-    return filledCount;
   }
 
   /**
@@ -968,9 +970,15 @@
   loadProfile(() => {
     setupDOMObserver();
     createFloatingPill();
-    injectSearchFillButton();
-    setInterval(injectSearchFillButton, 1000);
-    
+    injectRoleSearchDropdown();
+    // Refresh dropdown options whenever profile is updated
+    chrome.storage.onChanged.addListener((changes, ns) => {
+      if (ns === 'local' && changes.userProfile) {
+        const sel = document.getElementById('naukri-role-search-dropdown');
+        if (sel) _populateDropdownOptions(sel);
+      }
+    });
+
     setTimeout(fillCurrentForm, 100);
     setTimeout(fillCurrentForm, 400);
     setTimeout(fillCurrentForm, 1000);

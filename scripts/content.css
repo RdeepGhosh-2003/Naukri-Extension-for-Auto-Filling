@@ -117,53 +117,119 @@
   box-shadow: none;
 }
 
-/* Naukri Search Fill Button Styling */
-.naukri-search-fill-btn {
-  display: inline-flex;
+
+/* =========================================================
+   Floating Role-Search Dropdown  (bottom-right corner)
+   ========================================================= */
+
+#naukri-role-search-wrapper {
+  position: fixed;
+  bottom: 80px;            /* sit just above the SpeedFill pill */
+  right: 24px;
+  z-index: 999998;
+  display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 6px;
-  background-color: #4a90e2;
-  color: #ffffff;
-  border: 1px solid #4a90e2;
-  border-radius: 20px;
-  padding: 8px 18px;
-  font-family: Roboto, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  font-size: 14px;
-  font-weight: 600;
-  line-height: 1.4;
-  cursor: pointer;
-  margin-left: 8px;
-  box-shadow: 0 2px 6px rgba(74, 144, 226, 0.3);
-  transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.1s ease, box-shadow 0.2s ease;
-  vertical-align: middle;
-  z-index: 1000;
+  gap: 0;
+  /* Glassmorphism card */
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  padding: 5px 10px 5px 14px;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow:
+    0 10px 28px -6px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(59, 130, 246, 0.18),
+    0 0 18px rgba(59, 130, 246, 0.18);
+  transition:
+    box-shadow 0.25s ease,
+    transform 0.2s ease,
+    background 0.2s ease;
   user-select: none;
 }
 
-.naukri-search-fill-btn:hover {
-  background-color: #ff7555;
-  border-color: #ff7555;
-  box-shadow: 0 4px 12px rgba(255, 117, 85, 0.4);
-}
-
-.naukri-search-fill-btn:active {
-  transform: translateY(1px);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
-.naukri-search-fill-btn:disabled {
-  background-color: #9ca3af;
-  border-color: #9ca3af;
-  cursor: not-allowed;
-  transform: none;
-  box-shadow: none;
-}
-
-.naukri-search-fill-btn svg {
-  width: 16px;
-  height: 16px;
-  fill: currentColor;
+/* Rocket emoji label before the select */
+#naukri-role-search-wrapper::before {
+  content: '\1F680';
+  font-size: 16px;
+  margin-right: 8px;
   flex-shrink: 0;
+  line-height: 1;
+  filter: drop-shadow(0 0 4px rgba(59, 130, 246, 0.6));
 }
 
+#naukri-role-search-wrapper:hover {
+  transform: translateY(-3px);
+  box-shadow:
+    0 16px 36px -6px rgba(0, 0, 0, 0.65),
+    0 0 0 1px rgba(59, 130, 246, 0.35),
+    0 0 24px rgba(59, 130, 246, 0.35);
+}
+
+/* Flash green pulse when a role is selected */
+#naukri-role-search-wrapper.naukri-role-search-wrapper--active {
+  box-shadow:
+    0 12px 32px -6px rgba(0, 0, 0, 0.6),
+    0 0 0 2px rgba(16, 185, 129, 0.75),
+    0 0 20px rgba(16, 185, 129, 0.5);
+  background: rgba(15, 23, 42, 0.92);
+  animation: speedfill-dropdown-pulse 0.55s ease-out;
+}
+
+@keyframes speedfill-dropdown-pulse {
+  0%   { transform: scale(1);    }
+  40%  { transform: scale(1.04); }
+  100% { transform: scale(1);    }
+}
+
+/* ---- The <select> itself ---- */
+.naukri-role-search-dropdown {
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #f1f5f9;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 6px 32px 6px 0;   /* right padding leaves room for custom arrow */
+  min-width: 190px;
+  max-width: 260px;
+  /* Custom dropdown arrow (chevron SVG encoded) */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='%2394a3b8'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 4px center;
+  background-size: 18px;
+  /* smooth transitions */
+  transition: color 0.15s ease;
+}
+
+.naukri-role-search-dropdown:focus {
+  outline: none;
+  color: #38bdf8;
+}
+
+.naukri-role-search-dropdown:hover {
+  color: #e2e8f0;
+}
+
+/* Style <option> elements (limited cross-browser, best effort) */
+.naukri-role-search-dropdown option {
+  background: #1e293b;
+  color: #f1f5f9;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 6px 10px;
+}
+
+.naukri-role-search-dropdown option:disabled {
+  color: #64748b;
+  font-style: italic;
+}
+
+.naukri-role-search-dropdown option:hover {
+  background: #3b82f6;
+  color: #ffffff;
+}
