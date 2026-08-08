@@ -1,16 +1,16 @@
 {
   "manifest_version": 3,
-  "name": "Indeed SpeedFill Auto-Fill Engine",
+  "name": "Naukri SpeedFill Auto-Fill Engine",
   "version": "1.0.0",
-  "description": "Ultra-fast auto-filler for Indeed job applications in Chrome and Brave browser.",
+  "description": "Ultra-fast auto-filler for Naukri.com job applications in Chrome and Brave browser.",
   "permissions": [
     "storage",
     "activeTab",
     "notifications"
   ],
   "host_permissions": [
-    "https://*.indeed.com/*",
-    "https://indeed.com/*"
+    "https://*.naukri.com/*",
+    "https://naukri.com/*"
   ],
   "action": {
     "default_popup": "popup/popup.html"
@@ -21,8 +21,8 @@
   "content_scripts": [
     {
       "matches": [
-        "https://*.indeed.com/*",
-        "https://indeed.com/*"
+        "https://*.naukri.com/*",
+        "https://naukri.com/*"
       ],
       "all_frames": true,
       "match_about_blank": true,
@@ -42,7 +42,7 @@
         "default": "Alt+F",
         "mac": "Alt+F"
       },
-      "description": "Instant trigger auto-fill on current Indeed form"
+      "description": "Instant trigger auto-fill on current Naukri form"
     }
   }
 }

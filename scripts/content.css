@@ -1,4 +1,4 @@
-/* Indeed SpeedFill - Injected Styles */
+/* Naukri SpeedFill - Injected Styles */
 
 .speedfill-highlight {
   border-color: #10b981 !important;
@@ -116,3 +116,54 @@
   transform: none;
   box-shadow: none;
 }
+
+/* Naukri Search Fill Button Styling */
+.naukri-search-fill-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background-color: #4a90e2;
+  color: #ffffff;
+  border: 1px solid #4a90e2;
+  border-radius: 20px;
+  padding: 8px 18px;
+  font-family: Roboto, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+  cursor: pointer;
+  margin-left: 8px;
+  box-shadow: 0 2px 6px rgba(74, 144, 226, 0.3);
+  transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.1s ease, box-shadow 0.2s ease;
+  vertical-align: middle;
+  z-index: 1000;
+  user-select: none;
+}
+
+.naukri-search-fill-btn:hover {
+  background-color: #ff7555;
+  border-color: #ff7555;
+  box-shadow: 0 4px 12px rgba(255, 117, 85, 0.4);
+}
+
+.naukri-search-fill-btn:active {
+  transform: translateY(1px);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.naukri-search-fill-btn:disabled {
+  background-color: #9ca3af;
+  border-color: #9ca3af;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.naukri-search-fill-btn svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+  flex-shrink: 0;
+}
+

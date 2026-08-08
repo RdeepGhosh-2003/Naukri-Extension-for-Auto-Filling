@@ -1,7 +1,7 @@
 /**
- * Indeed SpeedFill - Main Content Script
- * Monitors DOM, auto-fills form inputs, dispatches native React events,
- * handles radio groups, CAPTCHA alerts, and interactive auto-advance.
+ * Naukri SpeedFill - Main Content Script
+ * Monitors Naukri DOM, auto-fills form inputs, dispatches native React & DOM events,
+ * handles Naukri drawers, chatbot screening modals, radio groups, and auto-submit.
  */
 
 (function() {
@@ -24,7 +24,7 @@
             userProfile = data;
             chrome.storage.local.set({ userProfile: data });
           })
-          .catch(err => console.error('[SpeedFill] Error loading default profile:', err));
+          .catch(err => console.error('[Naukri SpeedFill] Error loading default profile:', err));
       }
       if (callback) callback();
     });
@@ -34,12 +34,12 @@
   chrome.storage.onChanged.addListener((changes, namespace) => {
     if (namespace === 'local' && changes.userProfile) {
       userProfile = changes.userProfile.newValue;
-      console.log('[SpeedFill] User profile updated in real-time!');
+      console.log('[Naukri SpeedFill] User profile updated in real-time!');
     }
   });
 
   /**
-   * Inject value into React input control safely
+   * Inject value into React & standard DOM input control safely
    */
   function setReactInputValue(el, value) {
     if (!el || value === undefined || value === null) return false;
@@ -82,7 +82,7 @@
       el.value = String(value);
     }
 
-    // Dispatch synthetic React state events
+    // Dispatch synthetic React & DOM state events
     el.dispatchEvent(new Event('input', { bubbles: true }));
     el.dispatchEvent(new Event('change', { bubbles: true }));
     el.dispatchEvent(new Event('blur', { bubbles: true }));
@@ -98,7 +98,7 @@
   }
 
   /**
-   * Handle dropdown select elements
+   * Handle dropdown select elements & Naukri suggestor input options
    */
   function setSelectValue(selectEl, value) {
     if (!selectEl || !value) return false;
@@ -107,49 +107,55 @@
     }
 
     const targetVal = String(value).toLowerCase().trim();
-    let matchedOption = null;
 
-    for (const option of selectEl.options) {
-      const optText = option.textContent.toLowerCase().trim();
-      const optVal = option.value.toLowerCase().trim();
-      if (optText.includes(targetVal) || optVal.includes(targetVal) || targetVal.includes(optText)) {
-        matchedOption = option;
-        break;
+    // Standard <select> element
+    if (selectEl.tagName.toLowerCase() === 'select') {
+      let matchedOption = null;
+      for (const option of selectEl.options) {
+        const optText = option.textContent.toLowerCase().trim();
+        const optVal = option.value.toLowerCase().trim();
+        if (optText.includes(targetVal) || optVal.includes(targetVal) || targetVal.includes(optText)) {
+          matchedOption = option;
+          break;
+        }
+      }
+
+      if (matchedOption) {
+        selectEl.value = matchedOption.value;
+        selectEl.dispatchEvent(new Event('change', { bubbles: true }));
+        selectEl.dispatchEvent(new Event('blur', { bubbles: true }));
+        return true;
       }
     }
 
-    if (matchedOption) {
-      selectEl.value = matchedOption.value;
-      selectEl.dispatchEvent(new Event('change', { bubbles: true }));
-      selectEl.dispatchEvent(new Event('blur', { bubbles: true }));
-      return true;
-    }
     return false;
   }
 
   /**
-   * Smart Radio Button Group Handler for Location, Commute/Relocation, & Yes/No Screening Questions
+   * Smart Radio Button Group Handler for Location, Relocation, CTC, & Screening Questions on Naukri
    */
-  function handleRadioGroups() {
+  function handleRadioGroups(containerArg) {
     if (!userProfile) return 0;
+
+    const appContainer = containerArg || window.SpeedFillMatcher?.getAppContainer(document);
+    if (!appContainer) return 0;
+    if (window.SpeedFillMatcher?.isInsideExcludedContainer && window.SpeedFillMatcher.isInsideExcludedContainer(appContainer)) return 0;
 
     let filledCount = 0;
     const userCity = (userProfile.personal?.city || 'Bengaluru').toLowerCase();
-    const isUserBengaluru = userCity.includes('bengaluru') || userCity.includes('bangalore');
 
-    // Find radio group containers
-    const containers = document.querySelectorAll('fieldset, [role="radiogroup"], .ia-Questions-item, div[class*="Question"]');
+    // Find radio group containers within appContainer
+    const containers = appContainer.querySelectorAll('fieldset, [role="radiogroup"], .question-container, div[class*="Question"], div[class*="radio-group"]');
 
     containers.forEach(container => {
-      // Find question header text
-      const headerEl = container.querySelector('legend, h1, h2, h3, h4, label, [class*="label"], [class*="header"]');
+      if (window.SpeedFillMatcher?.isNonApplicationInput && window.SpeedFillMatcher.isNonApplicationInput(container)) return;
+
+      const headerEl = container.querySelector('legend, h1, h2, h3, h4, label, [class*="label"], [class*="title"], [class*="header"]');
       const questionText = headerEl ? headerEl.textContent.toLowerCase().trim() : container.textContent.toLowerCase().trim();
 
-      // Find radio options inside this container
       const radioInputs = Array.from(container.querySelectorAll('input[type="radio"]'));
       if (radioInputs.length === 0) return;
 
-      // Skip if a radio option is already selected
       const isAlreadySelected = radioInputs.some(r => r.checked);
       if (isAlreadySelected) return;
 
@@ -160,24 +166,21 @@
         const questionMentionsUserCity = questionText.includes('bengaluru') || questionText.includes('bangalore') || questionText.includes(userCity);
 
         if (questionMentionsUserCity) {
-          // User IS located here -> Click "Yes"
-          selectedInput = radioInputs.find(r => getRadioText(r).includes('yes'));
+          selectedInput = radioInputs.find(r => getRadioText(r, appContainer).includes('yes'));
         } else {
-          // User IS NOT located here (e.g. HITEC City, Hyderabad or Ahmedabad) -> Click "No"
-          selectedInput = radioInputs.find(r => getRadioText(r).includes('no'));
+          selectedInput = radioInputs.find(r => getRadioText(r, appContainer).includes('no'));
         }
       }
 
-      // 2. Will you be able to reliably commute or relocate to [City]...?
+      // 2. Relocation / Commute
       else if (questionText.includes('commute or relocate') || questionText.includes('relocate') || questionText.includes('commute to')) {
-        // Preferred option: "Yes, I am planning to relocate" OR "Yes, I can make the commute"
         selectedInput = radioInputs.find(r => {
-          const txt = getRadioText(r);
+          const txt = getRadioText(r, appContainer);
           return txt.includes('planning to relocate') || txt.includes('make the commute') || txt.includes('yes');
         });
       }
 
-      // 3. Q&A Bank Matching for other screening questions
+      // 3. Q&A Bank Matching
       else if (userProfile.screening && Array.isArray(userProfile.screening)) {
         for (const item of userProfile.screening) {
           const keywords = item.keywords.toLowerCase().split(',').map(k => k.trim());
@@ -185,9 +188,9 @@
           if (match) {
             const ans = item.answer.toLowerCase();
             if (ans.includes('yes') || ans.includes('true')) {
-              selectedInput = radioInputs.find(r => getRadioText(r).includes('yes'));
+              selectedInput = radioInputs.find(r => getRadioText(r, appContainer).includes('yes'));
             } else if (ans.includes('no') || ans.includes('false')) {
-              selectedInput = radioInputs.find(r => getRadioText(r).includes('no'));
+              selectedInput = radioInputs.find(r => getRadioText(r, appContainer).includes('no'));
             }
             break;
           }
@@ -196,7 +199,7 @@
 
       // Execute click if option found
       if (selectedInput && !selectedInput.checked) {
-        console.log('[Indeed SpeedFill] Auto-selecting radio option:', getRadioText(selectedInput));
+        console.log('[Naukri SpeedFill] Auto-selecting radio option:', getRadioText(selectedInput, appContainer));
         selectedInput.click();
         selectedInput.dispatchEvent(new Event('change', { bubbles: true }));
         filledCount++;
@@ -206,10 +209,11 @@
     return filledCount;
   }
 
-  function getRadioText(radio) {
+  function getRadioText(radio, containerEl) {
     let text = '';
+    const scope = containerEl || document;
     if (radio.id) {
-      const lbl = document.querySelector(`label[for="${CSS.escape(radio.id)}"]`);
+      const lbl = scope.querySelector(`label[for="${CSS.escape(radio.id)}"]`);
       if (lbl) text = lbl.textContent;
     }
     if (!text && radio.closest('label')) {
@@ -222,65 +226,57 @@
   }
 
   /**
-   * Handle "Add a resume" step: auto-select existing PDF resume and click Continue
+   * Handle Resume step in Naukri apply drawer
    */
-  function handleResumeStep() {
-    const isResumeStep = Array.from(document.querySelectorAll('h1, h2, h3, legend, header, div')).some(el => {
+  function handleResumeStep(containerArg) {
+    const appContainer = containerArg || window.SpeedFillMatcher?.getAppContainer(document);
+    if (!appContainer) return false;
+
+    const isResumeStep = Array.from(appContainer.querySelectorAll('h1, h2, h3, legend, header, div')).some(el => {
+      if (window.SpeedFillMatcher?.isNonApplicationInput && window.SpeedFillMatcher.isNonApplicationInput(el)) return false;
       const txt = el.textContent.toLowerCase().trim();
-      return txt.includes('add a resume') || txt.includes('select a resume') || txt.includes('choose a resume');
+      return txt.includes('select a resume') || txt.includes('choose a resume') || txt.includes('uploaded resume');
     });
 
     if (!isResumeStep) return false;
 
-    // Locate all resume cards
-    const resumeCards = Array.from(document.querySelectorAll('[data-testid*="resume"], [class*="ResumeCard"], [class*="resume-option"], div[role="radio"]'));
+    const resumeCards = Array.from(appContainer.querySelectorAll('[data-testid*="resume"], [class*="resume"], div[role="radio"]'));
     if (resumeCards.length === 0) return false;
 
-    let targetCard = null;
-    const targetResumeName = userProfile?.work?.targetRole?.targetResumeName?.toLowerCase().trim();
-
-    // 1. Try to find a specific resume if user defined one
-    if (targetResumeName) {
-      targetCard = resumeCards.find(card => card.textContent.toLowerCase().includes(targetResumeName));
-    }
-
-    // 2. Fallback to the first resume if no specific target or not found
-    if (!targetCard) {
-      targetCard = resumeCards[0];
-    }
+    let targetCard = resumeCards[0];
 
     if (targetCard && !targetCard.classList.contains('selected') && targetCard.getAttribute('aria-checked') !== 'true') {
-      console.log('[Indeed SpeedFill] Auto-selecting resume...');
+      console.log('[Naukri SpeedFill] Auto-selecting resume...');
       targetCard.click();
     }
 
     const delay = userProfile?.settings?.stepDelayMs || 500;
     if (userProfile?.settings?.autoSelectResume !== false || userProfile?.settings?.autoAdvanceStep !== false) {
-      setTimeout(clickContinueButton, delay);
+      clearTimeout(window._speedfillAdvanceTimer);
+      window._speedfillAdvanceTimer = setTimeout(() => clickContinueButton(appContainer), delay);
       return true;
     }
     return false;
   }
 
   /**
-   * Detect CAPTCHA and send browser notification to user across multi-tab applications
+   * Detect CAPTCHA and send browser notification
    */
   function detectCaptchaAndNotify() {
     const hasCaptchaElement = document.querySelector('iframe[src*="recaptcha"], iframe[title*="recaptcha"], .g-recaptcha, [class*="captcha"]');
-    const hasCaptchaText = document.body.innerText.includes("I'm not a robot") || document.body.innerText.includes("reCAPTCHA");
+    const bodyText = (document.body?.innerText || document.body?.textContent || '').toLowerCase();
+    const hasCaptchaText = bodyText.includes("i'm not a robot") || bodyText.includes("recaptcha");
 
     if ((hasCaptchaElement || hasCaptchaText) && !hasNotifiedCaptcha) {
       hasNotifiedCaptcha = true;
 
-      // Update tab document title visually
       if (!document.title.includes('🚨 CAPTCHA REQUIRED')) {
         document.title = `🚨 CAPTCHA REQUIRED - ${originalDocumentTitle}`;
       }
 
-      // Notify background service worker to trigger browser notification
       chrome.runtime.sendMessage({ action: 'notify_captcha' }, (response) => {
         if (chrome.runtime.lastError) {
-          console.log('[SpeedFill] Captcha notify error:', chrome.runtime.lastError.message);
+          console.log('[Naukri SpeedFill] Captcha notify error:', chrome.runtime.lastError.message);
         }
       });
 
@@ -295,8 +291,11 @@
   /**
    * Check for empty/unfilled inputs on the screen that could NOT be matched with dashboard data
    */
-  function checkUnmatchedUnfilledFields() {
-    const inputs = document.querySelectorAll(
+  function checkUnmatchedUnfilledFields(containerArg) {
+    const appContainer = containerArg || window.SpeedFillMatcher?.getAppContainer(document);
+    if (!appContainer) return 0;
+
+    const inputs = appContainer.querySelectorAll(
       'input[type="text"], input[type="email"], input[type="tel"], input[type="number"], input:not([type]), textarea, select'
     );
 
@@ -304,6 +303,7 @@
 
     inputs.forEach(el => {
       if (el.offsetWidth === 0 && el.offsetHeight === 0 || el.disabled || el.readOnly) return;
+      if (window.SpeedFillMatcher?.isNonApplicationInput && window.SpeedFillMatcher.isNonApplicationInput(el)) return;
       if (window.SpeedFillMatcher?.isSearchInput(el)) return;
 
       const isSelect = el.tagName.toLowerCase() === 'select';
@@ -320,9 +320,9 @@
       }
     });
 
-    // Check unfilled radio button groups
-    const radioContainers = document.querySelectorAll('fieldset, [role="radiogroup"], .ia-Questions-item');
+    const radioContainers = appContainer.querySelectorAll('fieldset, [role="radiogroup"], .question-container');
     radioContainers.forEach(container => {
+      if (window.SpeedFillMatcher?.isNonApplicationInput && window.SpeedFillMatcher.isNonApplicationInput(container)) return;
       const radios = Array.from(container.querySelectorAll('input[type="radio"]'));
       if (radios.length > 0 && !radios.some(r => r.checked)) {
         unmatchedCount++;
@@ -336,11 +336,11 @@
   }
 
   /**
-   * Attach interactive listeners so when user manually fills a missing field, auto-advance triggers instantly!
+   * Attach interactive listeners so when user manually fills a missing field, auto-advance triggers
    */
-  function attachInteractiveAutoAdvanceListeners() {
-    const appContainer = document.querySelector('div[role="dialog"], [class*="ia-Form"], form') || document.body;
-    if (appContainer.dataset.speedfillListenersAttached) return;
+  function attachInteractiveAutoAdvanceListeners(containerArg) {
+    const appContainer = containerArg || window.SpeedFillMatcher?.getAppContainer(document) || document.body;
+    if (!appContainer || appContainer.dataset.speedfillListenersAttached) return;
 
     appContainer.addEventListener('change', handleUserManualInput);
     appContainer.addEventListener('input', handleUserManualInput);
@@ -368,10 +368,9 @@
       
       const targetInput = inputEl || container;
       
-      // Get Question Text
       let headerEl = null;
       if (inputEl && inputEl.type === 'radio') {
-        headerEl = container.querySelector('legend, h1, h2, h3, h4, label, [class*="label"], [class*="header"]');
+        headerEl = container.querySelector('legend, h1, h2, h3, h4, label, [class*="label"], [class*="title"], [class*="header"]');
       } else {
         headerEl = document.querySelector(`label[for="${CSS.escape(targetInput.id)}"]`) || container.closest('label') || container.previousElementSibling;
       }
@@ -380,10 +379,8 @@
       if (!questionText && container.parentElement) questionText = container.parentElement.innerText.split('\n')[0];
       if (!questionText) questionText = 'Unknown Question';
 
-      // Clean Question
       questionText = questionText.replace(/[^a-zA-Z0-9 ]/g, '').toLowerCase().substring(0, 30).trim();
 
-      // Get Answer
       let answerText = '';
       if (inputEl && inputEl.type === 'radio') {
         const selected = container.querySelector('input[type="radio"]:checked');
@@ -398,14 +395,13 @@
         return;
       }
 
-      // Save to Storage
       if (userProfile && userProfile.screening) {
         userProfile.screening.push({ keywords: questionText, answer: answerText });
         chrome.storage.local.set({ userProfile: userProfile }, () => {
           btn.innerHTML = '✅ Saved!';
           btn.classList.add('saved');
           btn.disabled = true;
-          console.log('[SpeedFill] Saved new Q&A:', questionText, '->', answerText);
+          console.log('[Naukri SpeedFill] Saved new Q&A:', questionText, '->', answerText);
         });
       }
     });
@@ -418,8 +414,7 @@
         container.appendChild(btn);
       }
     } else {
-      // Safely inject below the input's wrapper to avoid breaking borders
-      const wrapper = container.closest('.ia-Questions-item') || container.parentElement;
+      const wrapper = container.closest('.question-container, .form-group') || container.parentElement;
       if (wrapper && wrapper.nextSibling) {
         wrapper.parentNode.insertBefore(btn, wrapper.nextSibling);
       } else if (wrapper) {
@@ -428,7 +423,6 @@
         container.parentNode.insertBefore(btn, container.nextSibling);
       }
       
-      // Ensure the button is styled to sit nicely below
       btn.style.display = 'block';
       btn.style.marginTop = '6px';
       btn.style.marginLeft = '0';
@@ -440,17 +434,16 @@
       const el = e.target;
       if (el.tagName.toLowerCase() === 'input' || el.tagName.toLowerCase() === 'textarea' || el.tagName.toLowerCase() === 'select') {
         
-        // FILTER: If this is a standard recognized field (like Job Title, Name), DO NOT inject the Q&A save button.
         const match = window.SpeedFillMatcher?.matchField(el, userProfile);
         if (match !== null && match !== undefined) {
           return; 
         }
 
         if (el.type !== 'radio' && el.type !== 'checkbox') {
-          if (!el.value) return; // Don't inject if they just cleared it
+          if (!el.value) return;
           injectSaveButton(el);
         } else if (el.type === 'radio') {
-          const container = el.closest('fieldset, [role="radiogroup"], .ia-Questions-item');
+          const container = el.closest('fieldset, [role="radiogroup"], .question-container');
           if (container && !container.dataset.speedfillSaveInjected) {
             injectSaveButton(container, el);
           }
@@ -458,14 +451,14 @@
       }
     }
 
-    const remainingUnmatched = checkUnmatchedUnfilledFields();
+    const appContainer = window.SpeedFillMatcher?.getAppContainer(document);
+    const remainingUnmatched = checkUnmatchedUnfilledFields(appContainer);
     updatePillStatus(remainingUnmatched, 0);
 
-    // If remaining unmatched fields reach 0, auto-advance step!
     if (remainingUnmatched === 0 && userProfile?.settings?.autoAdvanceStep !== false) {
-      console.log('[Indeed SpeedFill] All missing fields completed by user! Auto-advancing step...');
+      console.log('[Naukri SpeedFill] All missing fields completed by user! Auto-advancing step...');
       const delay = userProfile?.settings?.stepDelayMs || 500;
-      setTimeout(clickContinueButton, delay);
+      setTimeout(() => clickContinueButton(appContainer), delay);
     }
   }
 
@@ -481,26 +474,33 @@
       pill.innerHTML = `<span>⚠️ Review Needed (${unmatchedCount} Unfilled)</span>`;
     } else {
       pill.classList.remove('pill-warning');
-      pill.innerHTML = `<span>⚡ SpeedFill</span><span class="speedfill-badge">Alt + F</span>`;
+      pill.innerHTML = `<span>⚡ Naukri SpeedFill</span><span class="speedfill-badge">Alt + F</span>`;
     }
   }
 
   /**
-   * Find and click "Submit your application" button as soon as it becomes enabled
+   * Find and click final "Submit" / "Apply" button on Naukri
    */
-  function clickSubmitButton() {
-    const buttons = Array.from(document.querySelectorAll('button, a[role="button"], input[type="submit"]'));
+  function clickSubmitButton(containerArg) {
+    const appContainer = containerArg || window.SpeedFillMatcher?.getAppContainer(document);
+    if (!appContainer) return false;
+
+    const buttons = Array.from(appContainer.querySelectorAll('button, a[role="button"], input[type="submit"]'));
     const submitBtn = buttons.find(b => {
+      if (window.SpeedFillMatcher?.isNonApplicationInput && window.SpeedFillMatcher.isNonApplicationInput(b)) return false;
       const text = b.textContent.toLowerCase().trim();
       const isDisabled = b.disabled || b.getAttribute('aria-disabled') === 'true' || b.classList.contains('disabled');
       return (
+        text === 'apply' ||
+        text === 'apply now' ||
+        text.includes('submit application') ||
         text.includes('submit your application') ||
-        text.includes('submit application')
+        text.includes('save & apply')
       ) && !isDisabled;
     });
 
     if (submitBtn) {
-      console.log('[Indeed SpeedFill] Auto-submitting application...');
+      console.log('[Naukri SpeedFill] Auto-submitting application...');
       chrome.runtime.sendMessage({
         action: 'log_application',
         job: {
@@ -518,17 +518,16 @@
   }
 
   /**
-   * Attempt to extract the job title and company from the DOM
-   * Runs continuously to catch the title before the "Review" step hides it
+   * Extract job title and company from Naukri DOM
    */
-  function extractJobDetailsEarly() {
-    const titleEl = document.querySelector('.ia-JobHeader-title, h1, h2, [class*="jobTitle"]');
-    const companyEl = document.querySelector('.ia-JobHeader-company, [class*="companyName"]');
+  function extractJobDetailsEarly(containerArg) {
+    const scope = containerArg || document;
+    const titleEl = scope.querySelector('h1.title, .jd-header-title, .designation-title, h1[title], [class*="jd-header"] h1') || document.querySelector('h1.title, .jd-header-title, .designation-title, h1[title], [class*="jd-header"] h1');
+    const companyEl = scope.querySelector('.comp-name, .company-name, [class*="comp-name"], a.pad-rt') || document.querySelector('.comp-name, .company-name, [class*="comp-name"], a.pad-rt');
     
     if (titleEl && titleEl.textContent) {
       const txt = titleEl.textContent.trim();
-      // Ignore generic modal headers
-      if (!txt.toLowerCase().includes('review') && !txt.toLowerCase().includes('add a resume') && txt.length > 3) {
+      if (!txt.toLowerCase().includes('review') && txt.length > 2) {
         currentJobTitle = txt;
       }
     }
@@ -540,10 +539,9 @@
       }
     }
 
-    // Fallback to page title if we still have unknown role
     if (currentJobTitle === 'Unknown Role' || currentCompany === 'Unknown Company') {
       const pageTitle = document.title || '';
-      let parsedTitle = pageTitle.replace(' - Indeed', '').replace('Apply for ', '').replace('Apply: ', '').trim();
+      let parsedTitle = pageTitle.replace(' - Naukri.com', '').replace('Apply for ', '').replace('Apply: ', '').trim();
       
       if (parsedTitle.includes(' at ')) {
         const parts = parsedTitle.split(' at ');
@@ -560,7 +558,7 @@
   }
 
   /**
-   * Continuous monitor watching for reCAPTCHA checkmark resolution and button enablement
+   * Continuous monitor watching for CAPTCHA resolution & button enablement
    */
   function monitorCaptchaAndSubmit() {
     detectCaptchaAndNotify();
@@ -571,32 +569,48 @@
       detectCaptchaAndNotify();
 
       if (userProfile?.settings?.autoSubmitApplication !== false) {
+        const appContainer = window.SpeedFillMatcher?.getAppContainer(document);
+        if (!appContainer) return;
+
         if (userProfile?.settings?.pauseOnUnmatchedFields !== false) {
-          const unmatched = checkUnmatchedUnfilledFields();
+          const unmatched = checkUnmatchedUnfilledFields(appContainer);
           if (unmatched > 0) return;
         }
 
-        const submitted = clickSubmitButton();
+        const submitted = clickSubmitButton(appContainer);
         if (submitted) {
           clearInterval(window._captchaMonitorInterval);
         }
       }
-    }, 100); // Super-fast 100ms interval for lightning fast auto-submit
+    }, 100);
   }
 
   /**
-   * Find and trigger the "Continue" or "Next" button in Indeed wizard modal
+   * Find and trigger the "Continue" or "Next" or "Save and Continue" button on Naukri
    */
-  function clickContinueButton() {
-    const buttons = Array.from(document.querySelectorAll('button, a[role="button"]'));
+  function clickContinueButton(containerArg) {
+    clearTimeout(window._speedfillAdvanceTimer);
+    const appContainer = containerArg || window.SpeedFillMatcher?.getAppContainer(document);
+    if (!appContainer) return false;
+
+    const buttons = Array.from(appContainer.querySelectorAll('button, a[role="button"]'));
     const continueBtn = buttons.find(b => {
+      if (window.SpeedFillMatcher?.isNonApplicationInput && window.SpeedFillMatcher.isNonApplicationInput(b)) return false;
       const text = b.textContent.toLowerCase().trim();
       const isDisabled = b.disabled || b.getAttribute('aria-disabled') === 'true';
-      return (text === 'continue' || text.includes('continue') || text.includes('next') || text.includes('review your application')) && !isDisabled;
+      return (
+        text === 'continue' ||
+        text.includes('continue') ||
+        text.includes('next') ||
+        text.includes('save and continue') ||
+        text.includes('save & continue') ||
+        text === 'confirm' ||
+        text === 'send'
+      ) && !isDisabled;
     });
 
     if (continueBtn) {
-      console.log('[Indeed SpeedFill] Auto-advancing step...');
+      console.log('[Naukri SpeedFill] Auto-advancing step...');
       continueBtn.click();
       return true;
     }
@@ -604,7 +618,7 @@
   }
 
   /**
-   * Core execution function: scan and fill all visible fields
+   * Core execution function: scan and fill all visible Naukri fields
    */
   function fillCurrentForm() {
     if (!userProfile) {
@@ -612,30 +626,32 @@
       return 0;
     }
 
-    // Attempt to parse job details at every step before they disappear
-    extractJobDetailsEarly();
+    const appContainer = window.SpeedFillMatcher?.getAppContainer(document);
+    if (!appContainer) {
+      console.log('[Naukri SpeedFill] Standing by: No active job application container on screen.');
+      return 0;
+    }
 
-    // 1. Check for Resume step
-    const handledResume = handleResumeStep();
+    extractJobDetailsEarly(appContainer);
+
+    const handledResume = handleResumeStep(appContainer);
 
     let filledCount = 0;
 
-    // 2. Smart radio button groups auto-fill
-    filledCount += handleRadioGroups();
+    filledCount += handleRadioGroups(appContainer);
 
-    // 3. Scan for text inputs, email, tel, number, textarea
-    const inputs = document.querySelectorAll(
+    const inputs = appContainer.querySelectorAll(
       'input[type="text"], input[type="email"], input[type="tel"], input[type="number"], input:not([type]), textarea'
     );
 
     inputs.forEach(input => {
       if (input.offsetWidth === 0 && input.offsetHeight === 0) return;
+      if (window.SpeedFillMatcher?.isNonApplicationInput && window.SpeedFillMatcher.isNonApplicationInput(input)) return;
 
-      // AI Cover Letter Generator Hook
       if (input.tagName.toLowerCase() === 'textarea' && !input.dataset.speedfillAiInjected) {
         const lbl = document.querySelector(`label[for="${CSS.escape(input.id)}"]`) || input.closest('label');
         const lblTxt = lbl ? lbl.textContent.toLowerCase() : '';
-        if (lblTxt.includes('cover letter') || lblTxt.includes('message to hiring') || lblTxt.includes('additional information')) {
+        if (lblTxt.includes('cover letter') || lblTxt.includes('intro') || lblTxt.includes('message to hiring') || lblTxt.includes('additional information')) {
           injectAICoverLetterButton(input);
         }
       }
@@ -647,10 +663,10 @@
       }
     });
 
-    // 4. Scan for select dropdowns
-    const selects = document.querySelectorAll('select');
+    const selects = appContainer.querySelectorAll('select');
     selects.forEach(select => {
       if (select.offsetWidth === 0 && select.offsetHeight === 0) return;
+      if (window.SpeedFillMatcher?.isNonApplicationInput && window.SpeedFillMatcher.isNonApplicationInput(select)) return;
 
       const match = window.SpeedFillMatcher?.matchField(select, userProfile);
       if (match && match.value) {
@@ -660,40 +676,176 @@
     });
 
     if (filledCount > 0) {
-      console.log(`[Indeed SpeedFill] Auto-filled ${filledCount} application field(s).`);
+      console.log(`[Naukri SpeedFill] Auto-filled ${filledCount} application field(s).`);
     }
 
-    // Attach manual fill auto-advance listeners
-    attachInteractiveAutoAdvanceListeners();
+    attachInteractiveAutoAdvanceListeners(appContainer);
 
-    // 5. Check for unfilled unmatched fields that require user input
-    const unmatchedCount = checkUnmatchedUnfilledFields();
+    const unmatchedCount = checkUnmatchedUnfilledFields(appContainer);
     updatePillStatus(unmatchedCount, filledCount);
 
     const stepDelay = userProfile?.settings?.stepDelayMs !== undefined ? userProfile.settings.stepDelayMs : 150;
 
-    // 6. PAUSE AUTO-ADVANCE / SUBMIT if there are unmatched empty fields and feature is enabled
     if (unmatchedCount > 0 && userProfile?.settings?.pauseOnUnmatchedFields !== false) {
-      console.warn(`[Indeed SpeedFill] Pausing auto-advance: ${unmatchedCount} field(s) need manual input/dashboard entry.`);
+      console.warn(`[Naukri SpeedFill] Pausing auto-advance: ${unmatchedCount} field(s) need manual input/dashboard entry.`);
       return filledCount;
     }
 
-    // 7. Check for auto-submit & monitor CAPTCHA resolution
     if (userProfile?.settings?.autoSubmitApplication !== false) {
-      setTimeout(clickSubmitButton, stepDelay);
+      setTimeout(() => clickSubmitButton(appContainer), stepDelay);
       monitorCaptchaAndSubmit();
     }
 
-    // 8. Optionally auto-advance intermediate steps
     if ((userProfile?.settings?.autoAdvanceStep !== false || handledResume) && (filledCount > 0 || handledResume)) {
-      setTimeout(clickContinueButton, stepDelay);
+      setTimeout(() => clickContinueButton(appContainer), stepDelay);
     }
 
     return filledCount;
   }
 
   /**
-   * Setup MutationObserver to watch for step updates in Indeed's modal
+   * Inject or remove the "Search Fill" button based on domain and search bar presence
+   */
+  function injectSearchFillButton() {
+    const hostname = (typeof window !== 'undefined' && window.location) ? (window.location.hostname || '') : '';
+    const isNaukri = window.SpeedFillMatcher?.isNaukriPage
+      ? window.SpeedFillMatcher.isNaukriPage(hostname)
+      : (hostname && hostname.includes('naukri.com'));
+
+    // Restrict injection strictly to naukri.com pages
+    if (!isNaukri) {
+      removeSearchFillButton();
+      return null;
+    }
+
+    // Find search bar container
+    const searchContainer = window.SpeedFillMatcher?.findSearchContainer
+      ? window.SpeedFillMatcher.findSearchContainer(document)
+      : document.querySelector('form[name="searchForm"], .nMainNavbar, .search-box, .qsbWrapper');
+
+    // If search bar container is absent in DOM, remove/hide injected button
+    if (!searchContainer) {
+      removeSearchFillButton();
+      return null;
+    }
+
+    // Check if button already exists
+    let existingBtn = document.getElementById('naukri-search-fill-btn');
+    if (existingBtn) {
+      if (!searchContainer.contains(existingBtn) && existingBtn.parentElement !== searchContainer.parentElement) {
+        positionSearchFillButton(existingBtn, searchContainer);
+      }
+      return existingBtn;
+    }
+
+    // Create new button element
+    const btn = document.createElement('button');
+    btn.id = 'naukri-search-fill-btn';
+    btn.className = 'naukri-search-fill-btn';
+    btn.type = 'button';
+    btn.setAttribute('aria-label', 'Search Fill');
+
+    // Naukri search icon SVG inline + text
+    btn.innerHTML = `<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg><span>Search Fill</span>`;
+
+    btn.addEventListener('click', handleSearchFillClick);
+
+    positionSearchFillButton(btn, searchContainer);
+    return btn;
+  }
+
+  function positionSearchFillButton(btn, searchContainer) {
+    if (!btn || !searchContainer) return;
+    
+    // Place button directly after keyword input / search button inside search container
+    const keyInput = searchContainer.querySelector('#qsb-keys-sug') || searchContainer;
+    if (keyInput && keyInput.parentElement && keyInput !== searchContainer) {
+      const qsbForm = searchContainer.querySelector('.qsb-btn, button[type="submit"]') || keyInput.parentElement;
+      qsbForm.insertAdjacentElement('afterend', btn);
+    } else {
+      searchContainer.insertAdjacentElement('afterend', btn);
+    }
+
+    // Encourage horizontal alignment if parent is flex/inline-flex
+    const parentStyle = searchContainer.parentElement ? window.getComputedStyle(searchContainer.parentElement) : null;
+    if (searchContainer.parentElement && !(parentStyle?.display === 'flex' || parentStyle?.display === 'inline-flex')) {
+      searchContainer.parentElement.style.display = 'flex';
+      searchContainer.parentElement.style.alignItems = 'center';
+      searchContainer.parentElement.style.gap = '8px';
+    }
+  }
+
+  function removeSearchFillButton() {
+    const existingBtn = document.getElementById('naukri-search-fill-btn');
+    if (existingBtn && existingBtn.parentNode) {
+      existingBtn.parentNode.removeChild(existingBtn);
+    }
+  }
+
+  /**
+   * Handle Search Fill button click: read chrome.storage.local userProfile, extract target values, set inputs, dispatch React/DOM events
+   */
+  function handleSearchFillClick(e) {
+    if (e) {
+      if (typeof e.preventDefault === 'function') e.preventDefault();
+      if (typeof e.stopPropagation === 'function') e.stopPropagation();
+    }
+
+    if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+      chrome.storage.local.get(null, (result) => {
+        const profile = (result && result.userProfile) ? result.userProfile : (result || userProfile);
+        executeSearchFill(profile);
+      });
+    } else {
+      executeSearchFill(userProfile);
+    }
+  }
+
+  /**
+   * Execute search fill using extracted profile data and native setters
+   */
+  function executeSearchFill(profile) {
+    const activeProfile = profile || userProfile;
+    const { keywords, location } = window.SpeedFillMatcher?.extractSearchFillData
+      ? window.SpeedFillMatcher.extractSearchFillData(activeProfile)
+      : {
+          keywords: activeProfile?.work?.targetRole?.jobTitle || activeProfile?.work?.currentRole?.jobTitle || activeProfile?.work?.targetRole?.keySkills || '',
+          location: activeProfile?.work?.targetRole?.targetLocation || activeProfile?.personal?.city || ''
+        };
+
+    const { keywordInput, locationInput } = window.SpeedFillMatcher?.getSearchInputs
+      ? window.SpeedFillMatcher.getSearchInputs(document)
+      : {
+          keywordInput: document.querySelector('#qsb-keys-sug, input[name="qp"]'),
+          locationInput: document.querySelector('#qsb-location-sug, input[name="ql"]')
+        };
+
+    let filledCount = 0;
+
+    if (keywordInput && keywords) {
+      if (window.SpeedFillMatcher?.setNativeInputValue) {
+        window.SpeedFillMatcher.setNativeInputValue(keywordInput, keywords);
+      } else {
+        setReactInputValue(keywordInput, keywords);
+      }
+      filledCount++;
+    }
+
+    if (locationInput && location) {
+      if (window.SpeedFillMatcher?.setNativeInputValue) {
+        window.SpeedFillMatcher.setNativeInputValue(locationInput, location);
+      } else {
+        setReactInputValue(locationInput, location);
+      }
+      filledCount++;
+    }
+
+    console.log(`[Naukri SpeedFill] Search Fill executed: ${filledCount} field(s) filled. Keywords="${keywords}", Location="${location}"`);
+    return filledCount;
+  }
+
+  /**
+   * Setup MutationObserver to watch for step updates in Naukri's drawer or modal
    */
   function setupDOMObserver() {
     if (isObserverActive) return;
@@ -708,12 +860,16 @@
       }
 
       if (shouldFill) {
+        injectSearchFillButton();
         clearTimeout(window._speedfillTimer);
         window._speedfillTimer = setTimeout(() => {
           if (userProfile?.settings?.autoFillOnLoad !== false) {
-            fillCurrentForm();
+            const appContainer = window.SpeedFillMatcher?.getAppContainer(document);
+            if (appContainer) {
+              fillCurrentForm();
+            }
           }
-        }, 50); // Aggressive 50ms DOM mutation debounce
+        }, 50);
       }
     });
 
@@ -753,7 +909,7 @@
           setTimeout(() => btn.innerHTML = '✨ Generate with AI', 3000);
         } else {
           btn.innerHTML = '❌ Failed';
-          console.error('[SpeedFill] AI Gen Error:', response?.error);
+          console.error('[Naukri SpeedFill] AI Gen Error:', response?.error);
           alert('Failed to generate cover letter. Check your API key.');
           setTimeout(() => btn.innerHTML = '✨ Generate with AI', 3000);
         }
@@ -764,7 +920,7 @@
   }
 
   /**
-   * Create floating widget pill on Indeed page
+   * Create floating widget pill on Naukri page
    */
   function createFloatingPill() {
     if (document.getElementById('speedfill-floating-pill')) return;
@@ -772,22 +928,23 @@
     const pill = document.createElement('div');
     pill.id = 'speedfill-floating-pill';
     pill.innerHTML = `
-      <span>⚡ SpeedFill</span>
+      <span>⚡ Naukri SpeedFill</span>
       <span class="speedfill-badge">Alt + F</span>
     `;
 
     pill.addEventListener('click', () => {
-      const submitted = clickSubmitButton();
+      const appContainer = window.SpeedFillMatcher?.getAppContainer(document);
+      const submitted = clickSubmitButton(appContainer);
       if (!submitted) {
-        handleResumeStep();
+        handleResumeStep(appContainer);
         const count = fillCurrentForm();
-        clickContinueButton();
+        clickContinueButton(appContainer);
         pill.innerHTML = `<span>✅ SpeedFill Active</span>`;
       } else {
         pill.innerHTML = `<span>🚀 Submitted!</span>`;
       }
       setTimeout(() => {
-        const unmatched = checkUnmatchedUnfilledFields();
+        const unmatched = checkUnmatchedUnfilledFields(appContainer);
         updatePillStatus(unmatched, 0);
       }, 1500);
     });
@@ -798,10 +955,11 @@
   // Listen for hotkey messages from background script
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'trigger_autofill') {
-      const submitted = clickSubmitButton();
-      handleResumeStep();
+      const appContainer = window.SpeedFillMatcher?.getAppContainer(document);
+      const submitted = clickSubmitButton(appContainer);
+      handleResumeStep(appContainer);
       const filled = submitted ? 0 : fillCurrentForm();
-      clickContinueButton();
+      clickContinueButton(appContainer);
       sendResponse({ status: 'done', filled, submitted });
     }
   });
@@ -810,10 +968,12 @@
   loadProfile(() => {
     setupDOMObserver();
     createFloatingPill();
+    injectSearchFillButton();
+    setInterval(injectSearchFillButton, 1000);
     
-    setTimeout(fillCurrentForm, 100); // 100ms
-    setTimeout(fillCurrentForm, 400); // 400ms
-    setTimeout(fillCurrentForm, 1000); // 1s
+    setTimeout(fillCurrentForm, 100);
+    setTimeout(fillCurrentForm, 400);
+    setTimeout(fillCurrentForm, 1000);
     monitorCaptchaAndSubmit();
   });
 

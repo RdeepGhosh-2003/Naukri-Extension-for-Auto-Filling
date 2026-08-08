@@ -1,5 +1,5 @@
 /**
- * Indeed SpeedFill - Background Service Worker (Manifest V3)
+ * Naukri SpeedFill - Background Service Worker (Manifest V3)
  * Handles Hotkey commands, Browser Notifications, and extension communication
  */
 
@@ -18,8 +18,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       chrome.notifications.create(notifId, {
         type: 'basic',
         iconUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAOxAAADsQBlSsOGwAAADhJREFUeJztwQENAAAAwqD3T20PBxAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAwG048AABpWc2swAAAABJRU5ErkJggg==',
-        title: '🤖 Indeed SpeedFill - CAPTCHA Required!',
-        message: 'A job application tab requires CAPTCHA verification. Click to switch to this tab.',
+        title: '🤖 Naukri SpeedFill - CAPTCHA Required!',
+        message: 'A Naukri job application tab requires CAPTCHA verification. Click to switch to this tab.',
         priority: 2,
         requireInteraction: true
       });
@@ -53,7 +53,7 @@ async function handleGenerateCoverLetter({ jobTitle, company, profile }) {
   const apiKey = profile.settings?.geminiApiKey;
   if (!apiKey) throw new Error('No API Key provided');
 
-  let prompt = `Write a professional cover letter for the position of "${jobTitle}" at "${company}".\n\n`;
+  let prompt = `Write a professional cover letter / intro note for the position of "${jobTitle}" at "${company}".\n\n`;
   prompt += `Here are my details to include:\n`;
   
   if (profile.personal?.fullName) prompt += `- Name: ${profile.personal.fullName}\n`;
@@ -61,7 +61,9 @@ async function handleGenerateCoverLetter({ jobTitle, company, profile }) {
   if (profile.personal?.email) prompt += `- Email: ${profile.personal.email}\n`;
   
   if (profile.work?.currentRole?.jobTitle) prompt += `- Current Role: ${profile.work.currentRole.jobTitle} at ${profile.work.currentRole.company || 'current company'}\n`;
-  if (profile.work?.currentRole?.yearsExperience) prompt += `- Years Experience: ${profile.work.currentRole.yearsExperience}\n`;
+  if (profile.work?.currentRole?.yearsExperience) prompt += `- Total Experience: ${profile.work.currentRole.yearsExperience} years\n`;
+  if (profile.work?.targetRole?.keySkills) prompt += `- Key Skills: ${profile.work.targetRole.keySkills}\n`;
+  if (profile.work?.targetRole?.noticePeriod) prompt += `- Notice Period: ${profile.work.targetRole.noticePeriod}\n`;
   
   if (profile.education?.degree) prompt += `- Education: ${profile.education.degree} in ${profile.education.major} from ${profile.education.university}\n`;
 
@@ -69,7 +71,7 @@ async function handleGenerateCoverLetter({ jobTitle, company, profile }) {
   if (instructions) {
     prompt += `\nAdditional Instructions:\n${instructions}\n`;
   } else {
-    prompt += `\nKeep it concise, confident, and professional. Do not include placeholder brackets like [Date], just write the core letter bodies so I can paste it directly into an application box.`;
+    prompt += `\nKeep it concise, confident, and professional. Do not include placeholder brackets like [Date], just write the core letter bodies so I can paste it directly into a Naukri application box.`;
   }
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
@@ -113,7 +115,7 @@ chrome.commands.onCommand.addListener((command) => {
       if (tabs[0]?.id) {
         chrome.tabs.sendMessage(tabs[0].id, { action: 'trigger_autofill' }, (response) => {
           if (chrome.runtime.lastError) {
-            console.log('[SpeedFill Background] Message error:', chrome.runtime.lastError.message);
+            console.log('[Naukri SpeedFill Background] Message error:', chrome.runtime.lastError.message);
           }
         });
       }
@@ -129,10 +131,10 @@ chrome.runtime.onInstalled.addListener(() => {
         .then(res => res.json())
         .then(data => {
           chrome.storage.local.set({ userProfile: data }, () => {
-            console.log('[SpeedFill Background] Default profile initialized.');
+            console.log('[Naukri SpeedFill Background] Default profile initialized.');
           });
         })
-        .catch(err => console.error('[SpeedFill Background] Install init error:', err));
+        .catch(err => console.error('[Naukri SpeedFill Background] Install init error:', err));
     }
   });
 });

@@ -1,5 +1,5 @@
 /**
- * Indeed SpeedFill - Popup Controller
+ * Naukri SpeedFill - Popup Controller
  */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -75,7 +75,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (themeToggleBtn) themeToggleBtn.textContent = '☀️';
     } else {
       document.body.classList.remove('light-theme');
-    if (themeToggleBtn) themeToggleBtn.textContent = '🌙';
+      if (themeToggleBtn) themeToggleBtn.textContent = '🌙';
     }
     
     // Recalculate text contrast colors for the new theme
@@ -117,11 +117,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const yiq = ((rgb[0]*299)+(rgb[1]*587)+(rgb[2]*114))/1000;
     
-    // 1. Contrast text for buttons (e.g. White or Black text on the primary button)
+    // 1. Contrast text for buttons
     const contrastText = (yiq >= 128) ? '#0f172a' : '#ffffff';
     document.documentElement.style.setProperty('--primary-contrast-text', contrastText);
 
-    // 2. Safe text color for labels (e.g. big numbers)
+    // 2. Safe text color for labels
     const isLightMode = document.body.classList.contains('light-theme');
     let safeText = color;
     if (!isLightMode && yiq < 100) safeText = '#ffffff'; // Too dark for dark mode -> white
@@ -175,17 +175,17 @@ document.addEventListener('DOMContentLoaded', () => {
   // Populate HTML inputs from profile object
   function populateForm(profile) {
     // Current Role
-    document.getElementById('currentJobTitle').value = profile.work?.currentRole?.jobTitle || profile.work?.recentJobTitle || '';
-    document.getElementById('currentCompany').value = profile.work?.currentRole?.company || profile.work?.recentCompany || '';
-    document.getElementById('yearsExperience').value = profile.work?.currentRole?.yearsExperience || profile.work?.yearsExperience || '';
-    document.getElementById('currentSalary').value = profile.work?.currentRole?.currentSalary || profile.work?.currentSalary || '';
+    document.getElementById('currentJobTitle').value = profile.work?.currentRole?.jobTitle || '';
+    document.getElementById('currentCompany').value = profile.work?.currentRole?.company || '';
+    document.getElementById('yearsExperience').value = profile.work?.currentRole?.yearsExperience || '';
+    document.getElementById('currentSalary').value = profile.work?.currentRole?.currentSalary || '';
 
-    // Target Role
-    document.getElementById('targetJobTitle').value = profile.work?.targetRole?.jobTitle || profile.work?.recentJobTitle || '';
-    document.getElementById('targetLocation').value = profile.work?.targetRole?.targetLocation || profile.personal?.city || '';
-    document.getElementById('targetResumeName').value = profile.work?.targetRole?.targetResumeName || '';
-    document.getElementById('noticePeriod').value = profile.work?.targetRole?.noticePeriod || profile.work?.noticePeriod || '';
-    document.getElementById('expectedSalary').value = profile.work?.targetRole?.expectedSalary || profile.work?.expectedSalary || '';
+    // Target Role & Skills
+    document.getElementById('targetJobTitle').value = profile.work?.targetRole?.jobTitle || '';
+    document.getElementById('keySkills').value = profile.work?.targetRole?.keySkills || '';
+    document.getElementById('targetLocation').value = profile.work?.targetRole?.targetLocation || '';
+    document.getElementById('noticePeriod').value = profile.work?.targetRole?.noticePeriod || '';
+    document.getElementById('expectedSalary').value = profile.work?.targetRole?.expectedSalary || '';
 
     // Personal
     document.getElementById('fullName').value = profile.personal?.fullName || '';
@@ -194,7 +194,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('email').value = profile.personal?.email || '';
     document.getElementById('phone').value = profile.personal?.phone || '';
     document.getElementById('city').value = profile.personal?.city || '';
-    document.getElementById('state').value = profile.personal?.state || '';
+    if (document.getElementById('gender')) document.getElementById('gender').value = profile.personal?.gender || '';
     document.getElementById('linkedin').value = profile.personal?.linkedin || '';
     document.getElementById('coverLetterInstructions').value = profile.personal?.coverLetterInstructions || '';
 
@@ -231,11 +231,11 @@ document.addEventListener('DOMContentLoaded', () => {
         <button class="delete-btn" data-index="${index}">✕</button>
         <div class="form-group">
           <label>Question Keywords (comma separated)</label>
-          <input type="text" class="qa-keywords" value="${escapeHtml(item.keywords)}" placeholder="e.g. excel, vlookup">
+          <input type="text" class="qa-keywords" value="${escapeHtml(item.keywords)}" placeholder="e.g. ctc, notice period, relocation">
         </div>
         <div class="form-group">
           <label>Pre-Saved Answer</label>
-          <input type="text" class="qa-answer" value="${escapeHtml(item.answer)}" placeholder="e.g. Yes, 3+ years experience">
+          <input type="text" class="qa-answer" value="${escapeHtml(item.answer)}" placeholder="e.g. 30 Days / 12 Lakhs">
         </div>
       `;
       qaContainer.appendChild(card);
@@ -259,7 +259,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   resetDefaultsBtn?.addEventListener('click', () => {
-    if (confirm('Are you sure you want to reset profile to defaults (Software Engineer / Acme Corporation)?')) {
+    if (confirm('Are you sure you want to reset profile to defaults (Naukri Profile)?')) {
       resetToDefaultJson();
     }
   });
@@ -277,6 +277,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     const parsedDelay = parseInt(document.getElementById('stepDelayMs').value, 10);
+    const currSalaryVal = document.getElementById('currentSalary').value.trim();
+    const expSalaryVal = document.getElementById('expectedSalary').value.trim();
+    const noticeVal = document.getElementById('noticePeriod').value.trim();
 
     const updatedProfile = {
       work: {
@@ -284,14 +287,17 @@ document.addEventListener('DOMContentLoaded', () => {
           jobTitle: document.getElementById('currentJobTitle').value.trim(),
           company: document.getElementById('currentCompany').value.trim(),
           yearsExperience: document.getElementById('yearsExperience').value.trim(),
-          currentSalary: document.getElementById('currentSalary').value.trim()
+          currentSalary: currSalaryVal,
+          currentSalaryLakhs: currSalaryVal.replace(/[^0-9.]/g, '')
         },
         targetRole: {
           jobTitle: document.getElementById('targetJobTitle').value.trim(),
+          keySkills: document.getElementById('keySkills').value.trim(),
           targetLocation: document.getElementById('targetLocation').value.trim(),
-          targetResumeName: document.getElementById('targetResumeName').value.trim(),
-          noticePeriod: document.getElementById('noticePeriod').value.trim(),
-          expectedSalary: document.getElementById('expectedSalary').value.trim()
+          noticePeriod: noticeVal,
+          noticePeriodDays: noticeVal.replace(/[^0-9]/g, '') || '30',
+          expectedSalary: expSalaryVal,
+          expectedSalaryLakhs: expSalaryVal.replace(/[^0-9.]/g, '')
         }
       },
       personal: {
@@ -301,7 +307,7 @@ document.addEventListener('DOMContentLoaded', () => {
         email: document.getElementById('email').value.trim(),
         phone: document.getElementById('phone').value.trim(),
         city: document.getElementById('city').value.trim(),
-        state: document.getElementById('state').value.trim(),
+        gender: document.getElementById('gender') ? document.getElementById('gender').value.trim() : 'Male',
         linkedin: document.getElementById('linkedin').value.trim(),
         coverLetterInstructions: document.getElementById('coverLetterInstructions').value.trim()
       },
@@ -328,7 +334,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     chrome.storage.local.set({ userProfile: updatedProfile }, () => {
       currentProfile = updatedProfile;
-      showToast('Profile Saved Successfully!');
+      showToast('Naukri Profile Saved Successfully!');
     });
   });
 
@@ -357,13 +363,11 @@ document.addEventListener('DOMContentLoaded', () => {
       const now = new Date();
       const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       const oneDay = 24 * 60 * 60 * 1000;
-      // Start of week (Sunday)
       const weekStart = new Date(today.getTime() - (today.getDay() * oneDay)); 
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
       logs.forEach(log => {
         if (!log.date) return;
-        // Parse "M/D/YYYY" from either "M/D/YYYY" or "M/D/YYYY, h:mm PM"
         const dateStr = log.date.split(',')[0].trim();
         const parts = dateStr.split('/');
         if (parts.length === 3) {
@@ -405,9 +409,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
           });
           
-          // For 30 days, maybe don't label every single day to avoid clutter
           let label = daysLabel[targetDate.getDay()];
-          if (numDays > 7 && i !== 0 && targetDate.getDay() !== 1) { // Only show label on Mondays and Today
+          if (numDays > 7 && i !== 0 && targetDate.getDay() !== 1) {
             label = '';
           }
           if (i === 0) label = 'Tdy';
@@ -430,7 +433,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
       }
 
-      // Generate CSS Graph Data
       renderGraph('weekly-bar-chart', 7);
       renderGraph('monthly-bar-chart', 30, 'monthly-bar-wrapper');
 
@@ -438,11 +440,10 @@ document.addEventListener('DOMContentLoaded', () => {
       logsContainer.innerHTML = '';
       
       if (logs.length === 0) {
-        logsContainer.innerHTML = '<p style="color: var(--text-muted); font-size: 11px; text-align: center; margin-top: 10px;">No applications tracked yet.</p>';
+        logsContainer.innerHTML = '<p style="color: var(--text-muted); font-size: 11px; text-align: center; margin-top: 10px;">No Naukri applications tracked yet.</p>';
         return;
       }
 
-      // Show most recent first
       logs.slice().reverse().forEach(log => {
         const item = document.createElement('div');
         item.className = 'log-item';
@@ -453,7 +454,6 @@ document.addEventListener('DOMContentLoaded', () => {
           </div>
           <div class="log-item-company">${escapeHtml(log.company)}</div>
         `;
-        // Add link on click if url exists
         if (log.url) {
           item.style.cursor = 'pointer';
           item.addEventListener('click', () => chrome.tabs.create({ url: log.url }));
@@ -472,7 +472,6 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
 
-      // Create CSV header
       let csvContent = "data:text/csv;charset=utf-8,";
       csvContent += "Date Applied,Company Name,Job Title,Job Link\r\n";
 
@@ -487,7 +486,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const encodedUri = encodeURI(csvContent);
       const link = document.createElement("a");
       link.setAttribute("href", encodedUri);
-      link.setAttribute("download", `Indeed_SpeedFill_Applications_${new Date().toISOString().split('T')[0]}.csv`);
+      link.setAttribute("download", `Naukri_SpeedFill_Applications_${new Date().toISOString().split('T')[0]}.csv`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);

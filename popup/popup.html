@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Indeed SpeedFill Profile</title>
+  <title>Naukri SpeedFill Profile</title>
   <link rel="stylesheet" href="popup.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -15,7 +15,7 @@
     <header class="app-header">
       <div class="logo">
         <span class="icon">⚡</span>
-        <h1>SpeedFill <span class="badge">Indeed</span></h1>
+        <h1>SpeedFill <span class="badge">Naukri</span></h1>
       </div>
       <div style="display: flex; gap: 8px;">
         <button id="theme-toggle-btn" class="btn btn-secondary" style="padding: 8px; border-radius: 50%;" title="Toggle Light/Dark Theme">🌙</button>
@@ -45,21 +45,21 @@
             <h3>🏢 Current Role</h3>
           </div>
           <div class="form-group">
-            <label for="currentJobTitle">Current Job Title</label>
+            <label for="currentJobTitle">Current Job Title / Designation</label>
             <input type="text" id="currentJobTitle" placeholder="e.g. Software Engineer">
           </div>
           <div class="form-group">
-            <label for="currentCompany">Current Company</label>
-            <input type="text" id="currentCompany" placeholder="e.g. Acme Corporation">
+            <label for="currentCompany">Current Employer / Company</label>
+            <input type="text" id="currentCompany" placeholder="e.g. Acme Software Solutions">
           </div>
           <div class="form-grid">
             <div class="form-group">
-              <label for="yearsExperience">Years of Experience</label>
+              <label for="yearsExperience">Total Experience (Years)</label>
               <input type="text" id="yearsExperience" placeholder="e.g. 3">
             </div>
             <div class="form-group">
-              <label for="currentSalary">Current CTC (Per Annum)</label>
-              <input type="text" id="currentSalary" placeholder="e.g. 500000">
+              <label for="currentSalary">Current CTC (INR / Per Annum)</label>
+              <input type="text" id="currentSalary" placeholder="e.g. 1200000 (12 Lakhs)">
             </div>
           </div>
         </div>
@@ -67,28 +67,28 @@
         <!-- Target Role Section -->
         <div class="role-section-card target-card">
           <div class="role-section-header">
-            <h3>🎯 Target Role</h3>
+            <h3>🎯 Target Role & Skills</h3>
           </div>
           <div class="form-group">
             <label for="targetJobTitle">Target Job Title</label>
             <input type="text" id="targetJobTitle" placeholder="e.g. Senior Software Engineer">
           </div>
           <div class="form-group">
-            <label for="targetLocation">Preferred Target Location</label>
-            <input type="text" id="targetLocation" placeholder="e.g. Sample City">
+            <label for="keySkills">Key Skills (Comma Separated)</label>
+            <input type="text" id="keySkills" placeholder="e.g. JavaScript, React, Node.js, Python, REST APIs">
           </div>
           <div class="form-group">
-            <label for="targetResumeName">Target Resume Name (Optional)</label>
-            <input type="text" id="targetResumeName" placeholder="e.g. Software Engineer Resume">
+            <label for="targetLocation">Preferred Target Location(s)</label>
+            <input type="text" id="targetLocation" placeholder="e.g. Bengaluru, Hyderabad, Remote">
           </div>
           <div class="form-grid">
             <div class="form-group">
-              <label for="noticePeriod">Notice Period</label>
+              <label for="noticePeriod">Notice Period (Days)</label>
               <input type="text" id="noticePeriod" placeholder="e.g. 30 Days">
             </div>
             <div class="form-group">
-              <label for="expectedSalary">Expected CTC (Per Annum)</label>
-              <input type="text" id="expectedSalary" placeholder="e.g. 700000">
+              <label for="expectedSalary">Expected CTC (INR / Per Annum)</label>
+              <input type="text" id="expectedSalary" placeholder="e.g. 1800000 (18 Lakhs)">
             </div>
           </div>
         </div>
@@ -119,28 +119,30 @@
             <input type="email" id="email" placeholder="e.g. john.doe@example.com">
           </div>
           <div class="form-group">
-            <label for="phone">Phone Number</label>
-            <input type="tel" id="phone" placeholder="e.g. 1234567890">
+            <label for="phone">Mobile Number</label>
+            <input type="tel" id="phone" placeholder="e.g. 9876543210">
           </div>
         </div>
 
         <div class="form-grid">
           <div class="form-group">
-            <label for="city">City</label>
-            <input type="text" id="city" placeholder="Sample City">
+            <label for="city">Current City</label>
+            <input type="text" id="city" placeholder="e.g. Bengaluru">
           </div>
           <div class="form-group">
-            <label for="state">State / Province</label>
-            <input type="text" id="state" placeholder="e.g. CA">
+            <label for="gender">Gender</label>
+            <input type="text" id="gender" placeholder="e.g. Male / Female">
           </div>
         </div>
+
         <div class="form-group">
           <label for="linkedin">LinkedIn Profile URL</label>
           <input type="url" id="linkedin" placeholder="e.g. linkedin.com/in/johndoe">
         </div>
+
         <div class="form-group" style="margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border-color);">
-          <label for="coverLetterInstructions" style="color: #d946ef;">✨ AI Cover Letter Instructions (Optional)</label>
-          <textarea id="coverLetterInstructions" placeholder="e.g. Keep it under 3 paragraphs, highlight my data analysis skills, and mention I love problem solving." style="width: 100%; height: 60px; background: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-main); padding: 8px; border-radius: var(--radius-sm); font-size: 11px; resize: none;"></textarea>
+          <label for="coverLetterInstructions" style="color: #d946ef;">✨ AI Cover Letter / Intro Note Instructions (Optional)</label>
+          <textarea id="coverLetterInstructions" placeholder="e.g. Highlight 3+ years in full-stack web development, expertise in React & Node.js, immediate joiner." style="width: 100%; height: 60px; background: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-main); padding: 8px; border-radius: var(--radius-sm); font-size: 11px; resize: none;"></textarea>
         </div>
       </section>
 
@@ -148,28 +150,28 @@
       <section id="tab-education" class="tab-pane">
         <div class="form-group">
           <label for="degree">Highest Degree / Qualification</label>
-          <input type="text" id="degree" placeholder="e.g. Bachelor of Science">
+          <input type="text" id="degree" placeholder="e.g. Bachelor of Technology (B.Tech)">
         </div>
 
         <div class="form-group">
-          <label for="major">Field of Study / Major</label>
-          <input type="text" id="major" placeholder="e.g. Computer Science">
+          <label for="major">Specialization / Stream</label>
+          <input type="text" id="major" placeholder="e.g. Computer Science & Engineering">
         </div>
 
         <div class="form-group">
-          <label for="university">University / Institute</label>
-          <input type="text" id="university" placeholder="e.g. Sample University">
+          <label for="university">University / Institute / College</label>
+          <input type="text" id="university" placeholder="e.g. Sample University of Technology">
         </div>
 
         <div class="form-group">
-          <label for="graduationYear">Graduation Year</label>
+          <label for="graduationYear">Passing / Graduation Year</label>
           <input type="text" id="graduationYear" placeholder="e.g. 2022">
         </div>
       </section>
 
       <!-- Screening Q&A Tab -->
       <section id="tab-screening" class="tab-pane">
-        <p class="tab-description">Define custom keyword triggers & pre-saved answers for common Indeed screening questions.</p>
+        <p class="tab-description">Define custom keyword triggers & pre-saved answers for common Naukri screening questions & chat popups.</p>
         
         <div id="qa-container" class="qa-list">
           <!-- Dynamic Q&A items added here -->
@@ -183,7 +185,7 @@
         <div class="logs-header">
           <div class="logs-counter">
             <h2 id="total-applications-count">0</h2>
-            <span>Total Applications Sent</span>
+            <span>Total Naukri Applications Sent</span>
           </div>
           <button id="export-csv-btn" class="btn btn-primary">📥 Export CSV</button>
         </div>
@@ -229,8 +231,8 @@
       <section id="tab-settings" class="tab-pane">
         <div class="setting-item">
           <div class="setting-info">
-            <label for="autoFillOnLoad">Auto-fill On Step Load</label>
-            <span class="subtext">Automatically fill fields when Indeed application step renders</span>
+            <label for="autoFillOnLoad">Auto-fill On Form Load</label>
+            <span class="subtext">Automatically fill fields when Naukri drawer or modal renders</span>
           </div>
           <input type="checkbox" id="autoFillOnLoad" class="toggle-checkbox">
         </div>
@@ -254,7 +256,7 @@
         <div class="setting-item">
           <div class="setting-info">
             <label for="autoSelectResume">📄 Auto-Select Resume & Continue</label>
-            <span class="subtext">Automatically select attached resume card and click Continue</span>
+            <span class="subtext">Automatically select uploaded Naukri resume and click Continue</span>
           </div>
           <input type="checkbox" id="autoSelectResume" class="toggle-checkbox">
         </div>
@@ -262,7 +264,7 @@
         <div class="setting-item">
           <div class="setting-info">
             <label for="autoAdvanceStep">⚡ Auto-Advance Steps</label>
-            <span class="subtext">Automatically click "Continue" on filled steps</span>
+            <span class="subtext">Automatically click "Continue" / "Save & Apply" on filled steps</span>
           </div>
           <input type="checkbox" id="autoAdvanceStep" class="toggle-checkbox">
         </div>
@@ -270,7 +272,7 @@
         <div class="setting-item">
           <div class="setting-info">
             <label for="autoSubmitApplication">🚀 Auto-Submit Application</label>
-            <span class="subtext">Automatically click "Submit your application" on final review step</span>
+            <span class="subtext">Automatically click final "Apply" / "Submit Application" button</span>
           </div>
           <input type="checkbox" id="autoSubmitApplication" class="toggle-checkbox">
         </div>
@@ -296,12 +298,12 @@
         <div class="setting-item" style="flex-direction: column; align-items: flex-start; gap: 8px; border-color: rgba(217, 70, 239, 0.4); background: rgba(217, 70, 239, 0.05);">
           <div class="setting-info" style="max-width: 100%;">
             <label style="color: #d946ef;">🤖 Google Gemini API Key</label>
-            <span class="subtext">Required to power the AI Cover Letter generator. Get a free key from Google AI Studio.</span>
+            <span class="subtext">Required to power the AI Cover Letter / Intro Note generator. Get a free key from Google AI Studio.</span>
           </div>
           <input type="password" id="geminiApiKey" placeholder="Paste your API key here..." style="width: 100%;">
         </div>
 
-        <button id="reset-defaults-btn" class="btn btn-secondary full-width" style="margin-top: 10px; color: #f87171; border-color: rgba(248, 113, 113, 0.4);">🔄 Reset Profile to Default (Software Engineer / Acme Corp)</button>
+        <button id="reset-defaults-btn" class="btn btn-secondary full-width" style="margin-top: 10px; color: #f87171; border-color: rgba(248, 113, 113, 0.4);">🔄 Reset Profile to Default (Naukri Profile)</button>
 
         <div class="shortcut-box">
           <span>⌨️ Shortcut Hotkey: <strong>Alt + F</strong></span>

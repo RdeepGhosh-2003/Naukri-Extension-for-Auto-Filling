@@ -4,48 +4,62 @@
     "firstName": "John",
     "lastName": "Doe",
     "email": "john.doe@example.com",
-    "phone": "1234567890",
-    "city": "Sample City",
-    "state": "Sample State",
-    "country": "Sample Country",
+    "phone": "9876543210",
+    "city": "Bengaluru",
+    "state": "Karnataka",
+    "country": "India",
+    "gender": "Male",
+    "maritalStatus": "Single",
     "linkedin": "https://linkedin.com/in/example",
     "github": "https://github.com/example"
   },
   "work": {
     "currentRole": {
       "jobTitle": "Software Engineer",
-      "company": "Acme Corporation",
+      "company": "Acme Software Solutions",
       "yearsExperience": "3",
-      "currentSalary": "500000"
+      "currentSalary": "1200000",
+      "currentSalaryLakhs": "12"
     },
     "targetRole": {
       "jobTitle": "Senior Software Engineer",
-      "targetLocation": "Sample City",
-      "expectedSalary": "700000",
-      "noticePeriod": "30 Days"
+      "targetLocation": "Bengaluru",
+      "expectedSalary": "1800000",
+      "expectedSalaryLakhs": "18",
+      "noticePeriod": "30 Days",
+      "noticePeriodDays": "30",
+      "keySkills": "JavaScript, React, Node.js, Python, TypeScript, HTML, CSS, REST APIs"
     }
   },
   "education": {
-    "degree": "Bachelor of Science",
-    "major": "Computer Science",
-    "university": "Sample University",
+    "degree": "Bachelor of Technology",
+    "major": "Computer Science & Engineering",
+    "university": "Sample University of Technology",
     "graduationYear": "2022"
   },
   "screening": [
     {
-      "keywords": "javascript, python, programming",
-      "answer": "Yes, 3+ years experience with software development and programming."
+      "keywords": "javascript, python, programming, react",
+      "answer": "Yes, 3+ years hands-on experience building production software."
     },
     {
-      "keywords": "relocate, relocation",
-      "answer": "Yes, willing to relocate"
+      "keywords": "relocate, relocation, location",
+      "answer": "Yes, willing to relocate if required."
     },
     {
-      "keywords": "notice period, availability",
+      "keywords": "notice period, availability, join, how soon",
       "answer": "30 Days"
     },
     {
-      "keywords": "authorized, legal, work permit",
+      "keywords": "ctc, salary, current ctc",
+      "answer": "12 Lakhs"
+    },
+    {
+      "keywords": "expected ctc, desired ctc",
+      "answer": "18 Lakhs"
+    },
+    {
+      "keywords": "authorized, legal, work permit, passport",
       "answer": "Yes"
     }
   ],
