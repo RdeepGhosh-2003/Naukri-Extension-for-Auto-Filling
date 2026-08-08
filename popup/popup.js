@@ -43,6 +43,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  // Live chip preview as user types saved searches
+  document.getElementById('savedSearches')?.addEventListener('input', (e) => {
+    const lines = e.target.value.split('\n').map(s => s.trim()).filter(s => s.length > 0);
+    renderSearchChips(lines);
+  });
+
   // Tab Navigation Handler
   tabBtns.forEach(btn => {
     btn.addEventListener('click', () => {
@@ -219,6 +225,37 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Q&A Bank
     renderQaCards(profile.screening || []);
+
+    // Saved Quick Searches
+    const savedSearchesTA = document.getElementById('savedSearches');
+    if (savedSearchesTA) {
+      const searches = Array.isArray(profile.savedSearches) ? profile.savedSearches : [];
+      savedSearchesTA.value = searches.join('\n');
+      renderSearchChips(searches);
+    }
+  }
+
+  /**
+   * Render live preview chips for saved search entries
+   */
+  function renderSearchChips(searches) {
+    const preview = document.getElementById('saved-searches-preview');
+    if (!preview) return;
+    preview.innerHTML = '';
+    searches
+      .map(s => s.trim())
+      .filter(s => s.length > 0)
+      .forEach(s => {
+        const chip = document.createElement('span');
+        chip.textContent = s;
+        chip.style.cssText = [
+          'display:inline-flex', 'align-items:center', 'gap:4px',
+          'background:rgba(56,189,248,0.15)', 'color:#38bdf8',
+          'border:1px solid rgba(56,189,248,0.35)', 'border-radius:20px',
+          'padding:2px 10px', 'font-size:11px', 'font-weight:600'
+        ].join(';');
+        preview.appendChild(chip);
+      });
   }
 
   // Render Q&A screening cards
@@ -281,6 +318,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const expSalaryVal = document.getElementById('expectedSalary').value.trim();
     const noticeVal = document.getElementById('noticePeriod').value.trim();
 
+    // Saved Quick Searches — parse textarea (one entry per line)
+    const savedSearchesTA = document.getElementById('savedSearches');
+    const savedSearches = savedSearchesTA
+      ? savedSearchesTA.value
+          .split('\n')
+          .map(s => s.trim())
+          .filter(s => s.length > 0)
+      : (currentProfile.savedSearches || []);
+
     const updatedProfile = {
       work: {
         currentRole: {
@@ -318,6 +364,7 @@ document.addEventListener('DOMContentLoaded', () => {
         graduationYear: document.getElementById('graduationYear').value.trim()
       },
       screening: updatedScreening,
+      savedSearches: savedSearches,
       settings: {
         autoFillOnLoad: document.getElementById('autoFillOnLoad').checked,
         pauseOnUnmatchedFields: document.getElementById('pauseOnUnmatchedFields').checked,

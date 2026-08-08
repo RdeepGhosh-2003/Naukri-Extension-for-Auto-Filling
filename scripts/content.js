@@ -760,36 +760,37 @@
       const chosenRole = e.target.value;
       if (!chosenRole) return;
 
-      // Find Naukri's keyword search input
-      const keywordInput =
+      // Find Naukri's keyword search input (multiple selector fallbacks)
+      const searchInput =
         document.querySelector('input[placeholder*="Search jobs here"]') ||
         document.querySelector('#qsb-keys-sug') ||
         document.querySelector('input[name="qp"]') ||
         document.querySelector('input[placeholder*="search"]');
 
-      if (!keywordInput) {
+      if (!searchInput) {
         console.warn('[Naukri SpeedFill] Could not find search input to fill.');
         return;
       }
 
-      // Use native React setter so React state syncs correctly
-      const nativeSetter = Object.getOwnPropertyDescriptor(
-        window.HTMLInputElement.prototype, 'value'
-      )?.set;
+      // Step 1: Focus the input — Naukri's React listener activates on focus
+      searchInput.focus();
 
-      if (nativeSetter) {
-        nativeSetter.call(keywordInput, chosenRole);
-      } else {
-        keywordInput.value = chosenRole;
-      }
+      // Step 2: Use native property descriptor setter to bypass React's
+      // synthetic state wrapper. Direct value assignment (.value = x) is
+      // intercepted by React and ignored; the native setter bypasses it.
+      const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+        window.HTMLInputElement.prototype,
+        'value'
+      ).set;
+      nativeInputValueSetter.call(searchInput, chosenRole);
 
-      // Dispatch React-compatible events (no Enter / submit)
-      keywordInput.dispatchEvent(new Event('input',  { bubbles: true }));
-      keywordInput.dispatchEvent(new Event('change', { bubbles: true }));
+      // Step 3: Dispatch events in the order Naukri's React handlers expect
+      searchInput.dispatchEvent(new Event('input',  { bubbles: true }));
+      searchInput.dispatchEvent(new Event('change', { bubbles: true }));
 
       // Visual glow feedback on the search input
-      keywordInput.classList.add('speedfill-highlight');
-      setTimeout(() => keywordInput.classList.remove('speedfill-highlight'), 2000);
+      searchInput.classList.add('speedfill-highlight');
+      setTimeout(() => searchInput.classList.remove('speedfill-highlight'), 2000);
 
       // Flash wrapper to confirm selection
       wrapper.classList.add('naukri-role-search-wrapper--active');
@@ -808,7 +809,9 @@
 
   /**
    * Populate (or refresh) the role options inside the dropdown from the user profile.
-   * Reads targetRole.jobTitle as a comma-separated string and creates one <option> per role.
+   * Priority order:
+   *   1. profile.savedSearches  — dedicated array set by user in popup
+   *   2. profile.work.targetRole.jobTitle — comma-separated fallback
    */
   function _populateDropdownOptions(selectEl) {
     // Remove all non-placeholder options first (index > 0)
@@ -817,21 +820,32 @@
     }
 
     const profile = userProfile;
-    const rawRoles =
-      profile?.work?.targetRole?.jobTitle ||
-      profile?.work?.currentRole?.jobTitle ||
-      '';
 
-    const roles = String(rawRoles)
-      .split(',')
-      .map(r => r.trim())
-      .filter(r => r.length > 0);
+    // 1. Prefer savedSearches array (populated from popup UI)
+    let roles = [];
+    if (Array.isArray(profile?.savedSearches) && profile.savedSearches.length > 0) {
+      roles = profile.savedSearches
+        .map(r => String(r).trim())
+        .filter(r => r.length > 0);
+    }
+
+    // 2. Fallback: split targetRole.jobTitle by comma
+    if (roles.length === 0) {
+      const rawRoles =
+        profile?.work?.targetRole?.jobTitle ||
+        profile?.work?.currentRole?.jobTitle ||
+        '';
+      roles = String(rawRoles)
+        .split(',')
+        .map(r => r.trim())
+        .filter(r => r.length > 0);
+    }
 
     if (roles.length === 0) {
       const fallback = document.createElement('option');
       fallback.value = '';
       fallback.disabled = true;
-      fallback.textContent = '⚠\uFE0F No roles in profile';
+      fallback.textContent = '\u26a0\uFE0F No searches saved — add in popup';
       selectEl.appendChild(fallback);
       return;
     }
