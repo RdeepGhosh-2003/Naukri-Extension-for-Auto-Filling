@@ -833,65 +833,87 @@
       //   2. Wait ~150 ms for React to mount the <ul>/<li> items.
       //   3. Find the <li> whose text matches the saved experience value.
       //   4. Click it — this is the only way to register the selection.
+      // ── EXPERIENCE field — React dropdown interaction macro ────────────────
       if (chosenExperience) {
-        // Find the experience trigger (the clickable wrapper, not an <input>)
-        const expTrigger =
-          document.querySelector('.experienceDD')                       ||
-          document.querySelector('[data-key="experience"]')             ||
-          document.querySelector('.exp-hide')                           ||
-          document.querySelector('input[placeholder*="experience" i]')  ||
-          document.querySelector('#experienceInput');
+        const expInput =
+          document.querySelector('input[placeholder*="experience" i]') ||
+          document.querySelector('.experienceDD input')                ||
+          document.querySelector('#experienceInput')                   ||
+          document.querySelector('.experienceDD');
 
-        if (expTrigger) {
-          // Click to open Naukri's custom experience dropdown
-          expTrigger.click();
-          console.log('[Naukri SpeedFill] Clicked experience trigger, waiting for list...');
+        if (expInput) {
+          // Aggressive Trigger: dispatch mousedown, pointerdown, click on both input and parentElement
+          const triggerTargets = [expInput];
+          if (expInput.parentElement) triggerTargets.push(expInput.parentElement);
 
-          setTimeout(() => {
-            // Naukri renders the dropdown options as <li> or <span> inside a
-            // <ul> that appears in the DOM only after the click.
-            // We look broadly for list items inside any active dropdown overlay.
+          triggerTargets.forEach(target => {
+            ['mousedown', 'pointerdown', 'click'].forEach(evtType => {
+              target.dispatchEvent(new MouseEvent(evtType, { bubbles: true, cancelable: true, view: window }));
+            });
+          });
+          console.log('[Naukri SpeedFill] Triggered experience dropdown opening events.');
+
+          // Dynamic Polling (Wait for Render): 50ms interval, timeout after 1500ms
+          const startTime = Date.now();
+          const expVal = String(chosenExperience).trim();
+
+          const pollInterval = setInterval(() => {
             const listItems = document.querySelectorAll(
-              '.experienceDD li, .experienceDD .listItem, ' +
-              '.dropdown-list li, .customAutosuggest li, ' +
-              'ul.dropdown li, [class*="expDD"] li, ' +
-              '[data-key="experience"] li, .suggestor-container li'
+              '.dropdown li, .dropdown span, ' +
+              '.nI-gNb-sb__dropdown li, .nI-gNb-sb__dropdown span, ' +
+              '.experienceDD li, .experienceDD span, ' +
+              '.dropdown-list li, .dropdown-list span, ' +
+              '[class*="expDD"] li, [class*="expDD"] span, ' +
+              'ul.dropdown li, .customAutosuggest li, .suggestor-container li'
             );
 
-            if (listItems.length === 0) {
-              console.warn('[Naukri SpeedFill] Experience dropdown list did not render.');
-              return;
-            }
+            let matchedElement = null;
 
-            // Normalise the saved value: "3" → match "3 Year" / "3 Yrs" / "3+"
-            const targetNum = parseInt(chosenExperience, 10);
-            let matched = false;
-
-            listItems.forEach(item => {
-              if (matched) return;
-              const text = item.textContent.trim();
-              // Match "X Year", "X Yr", "X yrs", "X+ Year", or exact number
-              const itemNum = parseInt(text, 10);
-              if (
-                !isNaN(targetNum) &&
-                !isNaN(itemNum) &&
-                itemNum === targetNum
-              ) {
-                item.click();
-                matched = true;
-                console.log(`[Naukri SpeedFill] Experience selected: "${text}"`);
+            for (const item of listItems) {
+              const text = item.textContent.trim().toLowerCase();
+              if (expVal === '0' || expVal.toLowerCase() === 'fresher') {
+                if (text.includes('fresher')) {
+                  matchedElement = item;
+                  break;
+                }
+              } else {
+                if (
+                  text.includes(`${expVal} year`) ||
+                  text.includes(`${expVal} yr`)   ||
+                  text === `${expVal} y`         ||
+                  text === expVal
+                ) {
+                  matchedElement = item;
+                  break;
+                }
               }
-            });
-
-            if (!matched) {
-              console.warn(`[Naukri SpeedFill] No experience list item matched "${chosenExperience}". Available: ${Array.from(listItems).map(i => i.textContent.trim()).join(', ')}`);
-              // Close the dropdown so it doesn't stay open
-              expTrigger.click();
             }
-          }, 150);
+
+            // Fallback match if exact `${expVal} year` wasn't matched yet
+            if (!matchedElement && expVal !== '0' && expVal.toLowerCase() !== 'fresher') {
+              for (const item of listItems) {
+                const text = item.textContent.trim().toLowerCase();
+                if (text.includes(expVal)) {
+                  matchedElement = item;
+                  break;
+                }
+              }
+            }
+
+            if (matchedElement) {
+              clearInterval(pollInterval);
+              ['mousedown', 'pointerdown', 'click'].forEach(evtType => {
+                matchedElement.dispatchEvent(new MouseEvent(evtType, { bubbles: true, cancelable: true, view: window }));
+              });
+              console.log(`[Naukri SpeedFill] Experience option selected: "${matchedElement.textContent.trim()}"`);
+            } else if (Date.now() - startTime >= 1500) {
+              clearInterval(pollInterval);
+              console.warn(`[Naukri SpeedFill] Experience dropdown polling timed out for value "${chosenExperience}".`);
+            }
+          }, 50);
 
         } else {
-          console.warn('[Naukri SpeedFill] Experience trigger element not found on this page.');
+          console.warn('[Naukri SpeedFill] Experience input not found on page.');
         }
       }
 
