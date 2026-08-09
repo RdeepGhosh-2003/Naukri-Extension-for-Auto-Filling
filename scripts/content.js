@@ -713,8 +713,10 @@
                       chatInput.parentElement?.querySelector('button') ||
                       chatInput.closest('form, div[class*="chat" i], div[class*="drawer" i]')?.querySelector('button');
 
+      let answerInjected = false;
+
       if (answerValue) {
-        // MATCH FOUND: Auto-fill & auto-submit
+        // MATCH FOUND: Inject stored answer
         chatInput.style.border = "";
         chatInput.style.boxShadow = "";
 
@@ -730,18 +732,17 @@
           chatInput.classList.add('speedfill-highlight');
           setTimeout(() => chatInput.classList.remove('speedfill-highlight'), 2000);
           console.log(`[Naukri SpeedFill] Chatbot UI: Auto-injected known answer "${answerValue}" for question "${questionText}".`);
+          answerInjected = true;
         }
-
-        if (sendBtn) {
-          console.log('[Naukri SpeedFill] Chatbot UI: Auto-clicking Send/Save button...');
-          setTimeout(() => sendBtn.click(), 200);
-        }
-        return 1;
-
       } else {
-        // UNKNOWN QUESTION (The Pause / Wait & Save):
-        // 1. ABORT auto-submit so the page doesn't try to proceed with empty data
-        console.warn(`[Naukri SpeedFill] Wait & Save: No pre-saved answer found for question "${questionText}". Halting automation.`);
+        // UNKNOWN QUESTION (Strict Execution Halting / Race Condition Fix):
+        // 1. Kill all lingering timers & intervals to prevent accidental auto-submits
+        clearTimeout(window._speedfillSubmitTimer);
+        clearTimeout(window._speedfillAdvanceTimer);
+        if (window._captchaMonitorInterval) {
+          clearInterval(window._captchaMonitorInterval);
+          window._captchaMonitorInterval = null;
+        }
 
         // 2. Highlight input box with orange warning border to signal manual input required
         chatInput.style.border = "2px solid #ff9800";
@@ -786,8 +787,18 @@
           }, { capture: true, once: true });
         }
 
-        return 0; // ABORT auto-submit and return early
+        console.warn(`[Naukri SpeedFill] Unknown question detected ("${questionText}"). Halting automation for manual input.`);
+        return 0; // CRITICAL: Force exit the function entirely right here
       }
+
+      // ONLY execute click if the guard clause was passed and answer was successfully injected
+      if (answerInjected && sendBtn) {
+        console.log('[Naukri SpeedFill] Chatbot UI: Answer injected, auto-clicking Send/Save button with 500ms human delay...');
+        setTimeout(() => sendBtn.click(), 500);
+        return 1;
+      }
+
+      return 0;
     }
     // ─────────────────────────────────────────────────────────────────────────
 
