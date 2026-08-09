@@ -760,12 +760,19 @@
       const chosenRole = e.target.value;
       if (!chosenRole) return;
 
-      // Find Naukri's keyword search input (multiple selector fallbacks)
+      // Find Naukri's keyword search input — Naukri serves different layouts
+      // (homepage vs job listing), so we need an aggressive fallback chain.
+      // Selectors are ordered from most-specific to broadest.
       const searchInput =
-        document.querySelector('input[placeholder*="Search jobs here"]') ||
-        document.querySelector('#qsb-keys-sug') ||
-        document.querySelector('input[name="qp"]') ||
-        document.querySelector('input[placeholder*="search"]');
+        document.querySelector('input[placeholder*="designation" i]') ||
+        document.querySelector('input[placeholder*="keyword" i]')     ||
+        document.querySelector('.qsb input')                          ||
+        document.querySelector('input[placeholder*="Search jobs here" i]') ||
+        document.querySelector('.suggestor-input')                    ||
+        document.querySelector('.nI-gNb-sb__wrapper input')           ||
+        document.querySelector('#qsb-keys-sug')                       ||
+        document.querySelector('input[name="qp"]');
+
 
       if (!searchInput) {
         console.warn('[Naukri SpeedFill] Could not find search input to fill.');
