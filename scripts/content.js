@@ -13,6 +13,19 @@
   let currentCompany = 'Unknown Company';
   let _dropdownInjected = false; // hard one-shot guard — prevents MutationObserver loop
 
+  /**
+   * Helper to simulate a complete physical mouse interaction sequence for React components
+   */
+  function simulateHumanClick(element) {
+    if (!element) return;
+    const events = ['pointerdown', 'mousedown', 'mouseup', 'click'];
+    events.forEach(evType => {
+      element.dispatchEvent(new MouseEvent(evType, {
+        bubbles: true, cancelable: true, view: window, buttons: 1
+      }));
+    });
+  }
+
   // Load user profile from chrome.storage.local
   function loadProfile(callback) {
     chrome.storage.local.get(['userProfile'], (result) => {
@@ -837,61 +850,30 @@
       if (chosenExperience) {
         const expInput = document.querySelector('input[placeholder*="experience" i]');
         if (expInput) {
-          // Standard clicks that bubble up to hit React's synthetic listener
-          expInput.click();
-          if (expInput.parentElement) expInput.parentElement.click();
-          console.log('[Naukri SpeedFill] Clicked experience input & parentElement.');
+          simulateHumanClick(expInput);
+          if (expInput.parentElement) simulateHumanClick(expInput.parentElement);
+          console.log('[Naukri SpeedFill] Simulated human click on experience input & parentElement.');
 
           const startTime = Date.now();
           const expVal = String(chosenExperience).trim();
-
-          // Format target string based on expVal
-          let targetText = '';
-          if (expVal === '0' || expVal.toLowerCase() === 'fresher') {
-            targetText = 'fresher (less than 1 year)';
-          } else if (expVal === '1') {
-            targetText = '1 year';
-          } else {
-            targetText = `${expVal} years`;
-          }
+          const targetText = expVal === '0' ? 'fresher' : `${expVal} year`;
 
           const pollInterval = setInterval(() => {
-            // Massive, catch-all DOM polling selector
-            const listItems = Array.from(document.querySelectorAll(
-              'li, ul > div, div[class*="list" i], div[class*="dropdown" i] > div, div[class*="suggester" i] span, span'
-            ));
+            // Find all visible elements on the page
+            const allVisibleElements = Array.from(document.querySelectorAll('*'))
+              .filter(el => el.getBoundingClientRect().height > 0);
 
-            const targetLower = targetText.toLowerCase();
-
-            // Locate element matching target string EXACTLY (case-insensitive) AND visible
-            let matchedElement = listItems.find(el => {
-              const isVisible = el.getBoundingClientRect().height > 0;
-              if (!isVisible) return false;
-              const text = el.textContent.trim().toLowerCase();
-              return text === targetLower;
+            // Find the specific list item leaf node
+            const matchedItem = allVisibleElements.find(el => {
+              const text = el.textContent.toLowerCase().trim();
+              return text.includes(targetText) && el.children.length === 0; // Ensures we only click the deepest element
             });
 
-            // Flexible fallback match if exact full string wasn't found
-            if (!matchedElement) {
-              matchedElement = listItems.find(el => {
-                const isVisible = el.getBoundingClientRect().height > 0;
-                if (!isVisible) return false;
-                const text = el.textContent.trim().toLowerCase();
-                if (expVal === '0' || expVal.toLowerCase() === 'fresher') {
-                  return text.includes('fresher');
-                } else if (expVal === '1') {
-                  return text.includes('1 year') || text.includes('1 yr') || text === '1';
-                } else {
-                  return text.includes(`${expVal} year`) || text.includes(`${expVal} yr`) || text === expVal;
-                }
-              });
-            }
-
-            if (matchedElement) {
-              matchedElement.click();
+            if (matchedItem) {
+              simulateHumanClick(matchedItem);
               clearInterval(pollInterval);
-              console.log(`[Naukri SpeedFill] Experience option clicked: "${matchedElement.textContent.trim()}"`);
-            } else if (Date.now() - startTime >= 1500) {
+              console.log(`[Naukri SpeedFill] Experience option leaf node clicked: "${matchedItem.textContent.trim()}"`);
+            } else if (Date.now() - startTime >= 3000) {
               clearInterval(pollInterval);
               console.warn(`[Naukri SpeedFill] Experience dropdown polling timed out for value "${chosenExperience}".`);
             }
