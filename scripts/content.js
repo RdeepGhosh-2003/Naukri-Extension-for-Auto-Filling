@@ -822,6 +822,22 @@
         }
 
         // ALL DOM queries strictly inside setTimeout after 600ms delay:
+        // Helper: Auto-submit search after fields have populated
+        function triggerFinalSearch() {
+          setTimeout(() => {
+            const searchBtn = document.querySelector(
+              '.qsbSubmit, #ni-gnb-searchbar button, .nI-gNb-sb__icon-wrapper, ' +
+              'button[class*="search-btn" i], .nI-gNb-sb__btn, button[type="submit"]'
+            );
+            if (searchBtn) {
+              console.log('[Naukri SpeedFill] Auto-submitting search...');
+              searchBtn.click();
+            } else {
+              console.warn('[Naukri SpeedFill] Could not find the Search button to auto-submit.');
+            }
+          }, 300);
+        }
+
         // ── STEP 1: Inject Text Fields (Role & Location) ─────────────────────
         if (chosenRole) {
           const roleInput =
@@ -883,6 +899,7 @@
                 (expVal !== '0' && (currentExpVal.includes(`${expVal} year`) || currentExpVal.includes(`${expVal} yr`) || currentExpVal.includes(targetText)))
               ) {
                 console.log(`[Naukri SpeedFill] Experience field already matches "${targetText}", skipping update.`);
+                triggerFinalSearch();
                 return;
               }
 
@@ -926,17 +943,23 @@
                   simulateHumanClick(matchedItem);
                   clearInterval(window.expPollInterval);
                   window.expPollInterval = null;
+                  triggerFinalSearch();
                 } else if (Date.now() - startTime >= 3000) {
                   clearInterval(window.expPollInterval);
                   window.expPollInterval = null;
                   console.warn(`[Naukri SpeedFill] Step 3: Experience dropdown polling timed out for value "${chosenExperience}".`);
+                  triggerFinalSearch();
                 }
               }, 100);
 
             } else {
               console.warn('[Naukri SpeedFill] Step 2: Experience input not found on page.');
+              triggerFinalSearch();
             }
           }, 300);
+        } else {
+          // No experience specified — auto-submit after Role & Location injection
+          triggerFinalSearch();
         }
 
         // Flash wrapper to confirm selection
