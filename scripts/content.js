@@ -793,19 +793,13 @@
       // ── STEP 0: Gentle Wake Up Search Bar ─────────────────────────────────
       // Use native .click() on the search bar wrapper to trigger expansion
       // gently without overwhelming React's synthetic event queue.
-      const searchBarWrapper =
-        document.querySelector('.nI-gNb-sb__wrapper') ||
-        document.querySelector('.qsb') ||
-        document.querySelector('.nMainNavbar') ||
-        document.querySelector('input[placeholder*="Search jobs here" i]') ||
-        document.querySelector('input[placeholder*="designation" i]') ||
-        document.querySelector('input[placeholder*="keyword" i]');
+      const searchBarWrapper = document.querySelector('#ni-gnb-searchbar, .nI-gNb-sb__main, .nI-gNb-search-bar, .nI-gNb-sb__wrapper, .qsb, .nMainNavbar, input[placeholder*="Search jobs here" i], input[placeholder*="designation" i], input[placeholder*="keyword" i]');
 
       if (searchBarWrapper) {
         searchBarWrapper.click();
         console.log('[Naukri SpeedFill] Step 0: Gently clicked search bar wrapper to expand UI.');
       } else {
-        console.warn('[Naukri SpeedFill] Step 0: Search bar wrapper not found.');
+        console.warn('[Naukri SpeedFill] Step 0: Could not find search bar wrapper to wake up React state.');
       }
 
       // ── STEP 1 - STEP 3: Delayed Execution (600ms for React mount) ─────────
