@@ -642,6 +642,63 @@
       return 0;
     }
 
+    // ── Chatbot UI Support ──────────────────────────────────────────────────
+    const chatInput = document.querySelector('input[placeholder*="Type message here" i]') ||
+                      document.querySelector('input[placeholder*="type your answer" i]') ||
+                      document.querySelector('input[placeholder*="type here" i]') ||
+                      document.querySelector('.chat-input input') ||
+                      document.querySelector('[class*="chat" i] input[type="text"]');
+
+    if (chatInput) {
+      console.log('[Naukri SpeedFill] Chatbot UI detected on screen.');
+      let questionText = '';
+      const messageElements = Array.from(document.querySelectorAll('[class*="chat" i] [class*="msg" i], [class*="chat" i] p, [class*="chat" i] span, [class*="question" i], .bot-msg, .chat-msg, div[class*="message" i]'))
+        .filter(el => el.offsetWidth > 0 && el.offsetHeight > 0 && el.textContent.trim().length > 0);
+
+      if (messageElements.length > 0) {
+        questionText = messageElements[messageElements.length - 1].textContent.toLowerCase();
+      } else {
+        const container = chatInput.closest('[class*="chat" i], [class*="drawer" i], [class*="modal" i]') || document.body;
+        questionText = container.textContent.toLowerCase();
+      }
+
+      console.log('[Naukri SpeedFill] Chatbot question detected:', questionText);
+
+      let answerValue = '';
+      if (questionText.includes('experience') || questionText.includes('years') || questionText.includes('yr')) {
+        answerValue = userProfile.work?.currentRole?.yearsExperience ||
+                      (Array.isArray(userProfile.savedSearches) && userProfile.savedSearches[0]?.experience) ||
+                      '0';
+      }
+
+      if (answerValue) {
+        const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+          window.HTMLInputElement.prototype, 'value'
+        )?.set;
+
+        if (nativeInputValueSetter) {
+          chatInput.focus();
+          nativeInputValueSetter.call(chatInput, answerValue);
+          chatInput.dispatchEvent(new Event('input', { bubbles: true }));
+          chatInput.dispatchEvent(new Event('change', { bubbles: true }));
+          chatInput.classList.add('speedfill-highlight');
+          setTimeout(() => chatInput.classList.remove('speedfill-highlight'), 2000);
+          console.log(`[Naukri SpeedFill] Chatbot UI: Injected answer "${answerValue}" into chat input.`);
+        }
+
+        const sendBtn = document.querySelector('button[class*="save" i], button[class*="send" i], .send-btn, .save-btn, [class*="sendBtn" i], [class*="saveBtn" i]') ||
+                        chatInput.parentElement?.querySelector('button') ||
+                        chatInput.closest('form, div[class*="chat" i], div[class*="drawer" i]')?.querySelector('button');
+
+        if (sendBtn) {
+          console.log('[Naukri SpeedFill] Chatbot UI: Clicking Save/Send button...');
+          setTimeout(() => sendBtn.click(), 100);
+        }
+        return 1;
+      }
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
     const appContainer = window.SpeedFillMatcher?.getAppContainer(document);
     if (!appContainer) {
       console.log('[Naukri SpeedFill] Standing by: No active job application container on screen.');
