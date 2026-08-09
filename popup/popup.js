@@ -43,10 +43,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Live chip preview as user types saved searches
-  document.getElementById('savedSearches')?.addEventListener('input', (e) => {
-    const lines = e.target.value.split('\n').map(s => s.trim()).filter(s => s.length > 0);
-    renderSearchChips(lines);
+  // Saved Quick Searches: Add New Search button
+  document.getElementById('add-search-btn')?.addEventListener('click', () => {
+    appendSearchBlock({});
   });
 
   // Tab Navigation Handler
@@ -226,36 +225,88 @@ document.addEventListener('DOMContentLoaded', () => {
     // Q&A Bank
     renderQaCards(profile.screening || []);
 
-    // Saved Quick Searches
-    const savedSearchesTA = document.getElementById('savedSearches');
-    if (savedSearchesTA) {
-      const searches = Array.isArray(profile.savedSearches) ? profile.savedSearches : [];
-      savedSearchesTA.value = searches.join('\n');
-      renderSearchChips(searches);
-    }
+    // Saved Quick Searches — render dynamic blocks
+    renderSearchBlocks(
+      Array.isArray(profile.savedSearches) ? profile.savedSearches : []
+    );
   }
 
   /**
-   * Render live preview chips for saved search entries
+   * Render all search-block cards from an array of { role, location, experience } objects.
    */
-  function renderSearchChips(searches) {
-    const preview = document.getElementById('saved-searches-preview');
-    if (!preview) return;
-    preview.innerHTML = '';
-    searches
-      .map(s => s.trim())
-      .filter(s => s.length > 0)
-      .forEach(s => {
-        const chip = document.createElement('span');
-        chip.textContent = s;
-        chip.style.cssText = [
-          'display:inline-flex', 'align-items:center', 'gap:4px',
-          'background:rgba(56,189,248,0.15)', 'color:#38bdf8',
-          'border:1px solid rgba(56,189,248,0.35)', 'border-radius:20px',
-          'padding:2px 10px', 'font-size:11px', 'font-weight:600'
-        ].join(';');
-        preview.appendChild(chip);
+  function renderSearchBlocks(searches) {
+    const container = document.getElementById('saved-searches-container');
+    if (!container) return;
+    container.innerHTML = '';
+    const list = searches.length > 0 ? searches : [{}]; // always at least 1 empty block
+    list.forEach(item => appendSearchBlock(item));
+  }
+
+  /**
+   * Append a single styled search-block card to #saved-searches-container.
+   * Design mirrors the "Target Role & Skills" card (same form-group, form-grid classes).
+   */
+  function appendSearchBlock(item = {}) {
+    const container = document.getElementById('saved-searches-container');
+    if (!container) return;
+
+    const block = document.createElement('div');
+    block.className = 'search-block';
+    block.style.cssText = [
+      'margin-bottom:10px',
+      'padding:14px 16px',
+      'background:var(--bg-input)',
+      'border:1px solid rgba(56,189,248,0.25)',
+      'border-radius:var(--radius-sm)',
+      'position:relative'
+    ].join(';');
+
+    const blockNum = container.querySelectorAll('.search-block').length + 1;
+
+    block.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <span class="search-block-label" style="font-size:12px;font-weight:700;color:#38bdf8;letter-spacing:0.3px;">
+          🔍 Search #${blockNum}
+        </span>
+        <button class="delete-search-btn" type="button"
+          style="background:rgba(248,113,113,0.12);border:1px solid rgba(248,113,113,0.3);
+                 color:#f87171;border-radius:6px;padding:3px 9px;font-size:11px;
+                 cursor:pointer;line-height:1.4;">
+          🗑️ Remove
+        </button>
+      </div>
+      <div class="form-group">
+        <label>Target Job Title / Role</label>
+        <input type="text" class="ss-role"
+          value="${escapeHtml(item.role || '')}"
+          placeholder="e.g. Data Analyst">
+      </div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Location</label>
+          <input type="text" class="ss-location"
+            value="${escapeHtml(item.location || '')}"
+            placeholder="e.g. Bengaluru">
+        </div>
+        <div class="form-group">
+          <label>Experience (Years)</label>
+          <input type="text" class="ss-experience"
+            value="${escapeHtml(item.experience || '')}"
+            placeholder="e.g. 2">
+        </div>
+      </div>
+    `;
+
+    // Remove this block and re-number remaining ones
+    block.querySelector('.delete-search-btn').addEventListener('click', () => {
+      block.remove();
+      container.querySelectorAll('.search-block').forEach((b, i) => {
+        const lbl = b.querySelector('.search-block-label');
+        if (lbl) lbl.textContent = `🔍 Search #${i + 1}`;
       });
+    });
+
+    container.appendChild(block);
   }
 
   // Render Q&A screening cards
@@ -318,14 +369,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const expSalaryVal = document.getElementById('expectedSalary').value.trim();
     const noticeVal = document.getElementById('noticePeriod').value.trim();
 
-    // Saved Quick Searches — parse textarea (one entry per line)
-    const savedSearchesTA = document.getElementById('savedSearches');
-    const savedSearches = savedSearchesTA
-      ? savedSearchesTA.value
-          .split('\n')
-          .map(s => s.trim())
-          .filter(s => s.length > 0)
-      : (currentProfile.savedSearches || []);
+    // Saved Quick Searches — collect { role, location, experience } objects from blocks
+    const searchBlocks = document.querySelectorAll('#saved-searches-container .search-block');
+    const savedSearches = Array.from(searchBlocks)
+      .map(block => ({
+        role:       block.querySelector('.ss-role')?.value.trim()       || '',
+        location:   block.querySelector('.ss-location')?.value.trim()   || '',
+        experience: block.querySelector('.ss-experience')?.value.trim() || ''
+      }))
+      .filter(s => s.role || s.location || s.experience);
 
     const updatedProfile = {
       work: {

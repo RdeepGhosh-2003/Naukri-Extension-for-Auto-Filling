@@ -755,58 +755,98 @@
     // Populate role options from profile
     _populateDropdownOptions(select);
 
-    // --- onChange handler: fill Naukri search bar ---
+    // --- onChange handler: fill Role + Location + Experience in Naukri search bar ---
     select.addEventListener('change', (e) => {
-      const chosenRole = e.target.value;
-      if (!chosenRole) return;
+      const chosenIdx = parseInt(e.target.value, 10);
+      if (isNaN(chosenIdx)) return;
 
-      // Find Naukri's keyword search input — Naukri serves different layouts
-      // (homepage vs job listing), so we need an aggressive fallback chain.
-      // Selectors are ordered from most-specific to broadest.
-      const searchInput =
-        document.querySelector('input[placeholder*="designation" i]') ||
-        document.querySelector('input[placeholder*="keyword" i]')     ||
-        document.querySelector('.qsb input')                          ||
-        document.querySelector('input[placeholder*="Search jobs here" i]') ||
-        document.querySelector('.suggestor-input')                    ||
-        document.querySelector('.nI-gNb-sb__wrapper input')           ||
-        document.querySelector('#qsb-keys-sug')                       ||
-        document.querySelector('input[name="qp"]');
+      // Look up the full search object from the profile by index
+      const profile = userProfile;
+      const searches = Array.isArray(profile?.savedSearches) ? profile.savedSearches : [];
+      const entry = searches[chosenIdx];
 
-
-      if (!searchInput) {
-        console.warn('[Naukri SpeedFill] Could not find search input to fill.');
-        return;
+      let chosenRole = '', chosenLocation = '', chosenExperience = '';
+      if (entry && typeof entry === 'object') {
+        chosenRole       = String(entry.role       || '').trim();
+        chosenLocation   = String(entry.location   || '').trim();
+        chosenExperience = String(entry.experience || '').trim();
+      } else if (typeof entry === 'string') {
+        chosenRole = entry.trim(); // legacy string format fallback
       }
 
-      // Step 1: Focus the input — Naukri's React listener activates on focus
-      searchInput.focus();
+      if (!chosenRole && !chosenLocation && !chosenExperience) return;
 
-      // Step 2: Use native property descriptor setter to bypass React's
-      // synthetic state wrapper. Direct value assignment (.value = x) is
-      // intercepted by React and ignored; the native setter bypasses it.
+      // Native React setter — bypasses React's synthetic state wrapper.
+      // Direct assignment (.value = x) is intercepted and ignored by React.
       const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
-        window.HTMLInputElement.prototype,
-        'value'
+        window.HTMLInputElement.prototype, 'value'
       ).set;
-      nativeInputValueSetter.call(searchInput, chosenRole);
 
-      // Step 3: Dispatch events in the order Naukri's React handlers expect
-      searchInput.dispatchEvent(new Event('input',  { bubbles: true }));
-      searchInput.dispatchEvent(new Event('change', { bubbles: true }));
+      // Helper: focus + native-set + dispatch events for one input field
+      function injectReactValue(input, value) {
+        if (!input || !value) return false;
+        input.focus();
+        nativeInputValueSetter.call(input, value);
+        input.dispatchEvent(new Event('input',  { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        input.classList.add('speedfill-highlight');
+        setTimeout(() => input.classList.remove('speedfill-highlight'), 2000);
+        return true;
+      }
 
-      // Visual glow feedback on the search input
-      searchInput.classList.add('speedfill-highlight');
-      setTimeout(() => searchInput.classList.remove('speedfill-highlight'), 2000);
+      // ── ROLE / KEYWORD field ─────────────────────────────────────────────
+      if (chosenRole) {
+        const roleInput =
+          document.querySelector('input[placeholder*="designation" i]') ||
+          document.querySelector('input[placeholder*="keyword" i]')     ||
+          document.querySelector('.qsb input')                          ||
+          document.querySelector('input[placeholder*="Search jobs here" i]') ||
+          document.querySelector('.suggestor-input')                    ||
+          document.querySelector('.nI-gNb-sb__wrapper input')           ||
+          document.querySelector('#qsb-keys-sug')                       ||
+          document.querySelector('input[name="qp"]');
+        if (injectReactValue(roleInput, chosenRole)) {
+          console.log(`[Naukri SpeedFill] Role filled: "${chosenRole}"`);
+        } else {
+          console.warn('[Naukri SpeedFill] Role input not found.');
+        }
+      }
+
+      // ── LOCATION field ───────────────────────────────────────────────────
+      if (chosenLocation) {
+        const locationInput =
+          document.querySelector('input[placeholder*="location" i]') ||
+          document.querySelector('#qsb-location-sug')               ||
+          document.querySelector('input[name="ql"]');
+        if (injectReactValue(locationInput, chosenLocation)) {
+          console.log(`[Naukri SpeedFill] Location filled: "${chosenLocation}"`);
+        } else {
+          console.warn('[Naukri SpeedFill] Location input not found.');
+        }
+      }
+
+      // ── EXPERIENCE field ─────────────────────────────────────────────────
+      if (chosenExperience) {
+        const expInput =
+          document.querySelector('input[placeholder*="experience" i]') ||
+          document.querySelector('.experienceDD input')                ||
+          document.querySelector('#experienceInput')                   ||
+          document.querySelector('input[name="experience"]');
+        if (injectReactValue(expInput, chosenExperience)) {
+          console.log(`[Naukri SpeedFill] Experience filled: "${chosenExperience}"`);
+        } else {
+          console.warn('[Naukri SpeedFill] Experience input not found (may not exist on this page).');
+        }
+      }
 
       // Flash wrapper to confirm selection
       wrapper.classList.add('naukri-role-search-wrapper--active');
       setTimeout(() => wrapper.classList.remove('naukri-role-search-wrapper--active'), 600);
 
-      // Reset dropdown back to placeholder so it looks clean for next use
+      // Reset dropdown to placeholder after brief delay
       setTimeout(() => { select.value = ''; }, 800);
 
-      console.log(`[Naukri SpeedFill] Search field filled with role: "${chosenRole}"`);
+      console.log(`[Naukri SpeedFill] Quick Search: Role="${chosenRole}" | Location="${chosenLocation}" | Exp="${chosenExperience}"`);
     });
 
     wrapper.appendChild(select);
@@ -815,54 +855,64 @@
   }
 
   /**
-   * Populate (or refresh) the role options inside the dropdown from the user profile.
-   * Priority order:
-   *   1. profile.savedSearches  — dedicated array set by user in popup
-   *   2. profile.work.targetRole.jobTitle — comma-separated fallback
+   * Populate (or refresh) the role options inside the dropdown.
+   * Reads savedSearches[] — array of { role, location, experience } objects.
+   * option.value  = array index (used by change handler to look up full object)
+   * option.text   = "Data Analyst | Bengaluru | 2 Yr"
+   * Falls back to comma-split targetRole.jobTitle for backward compatibility.
    */
   function _populateDropdownOptions(selectEl) {
-    // Remove all non-placeholder options first (index > 0)
+    // Remove all non-placeholder options (index > 0)
     while (selectEl.options.length > 1) {
       selectEl.remove(1);
     }
 
     const profile = userProfile;
+    const searches = Array.isArray(profile?.savedSearches) ? profile.savedSearches : [];
 
-    // 1. Prefer savedSearches array (populated from popup UI)
-    let roles = [];
-    if (Array.isArray(profile?.savedSearches) && profile.savedSearches.length > 0) {
-      roles = profile.savedSearches
-        .map(r => String(r).trim())
-        .filter(r => r.length > 0);
-    }
+    if (searches.length > 0) {
+      searches.forEach((entry, idx) => {
+        const opt = document.createElement('option');
+        opt.value = String(idx); // index — looked up in change handler
 
-    // 2. Fallback: split targetRole.jobTitle by comma
-    if (roles.length === 0) {
-      const rawRoles =
-        profile?.work?.targetRole?.jobTitle ||
-        profile?.work?.currentRole?.jobTitle ||
-        '';
-      roles = String(rawRoles)
-        .split(',')
-        .map(r => r.trim())
-        .filter(r => r.length > 0);
-    }
+        if (entry && typeof entry === 'object') {
+          const parts = [];
+          if (entry.role)       parts.push(String(entry.role).trim());
+          if (entry.location)   parts.push(String(entry.location).trim());
+          if (entry.experience) parts.push(`${String(entry.experience).trim()} Yr`);
+          opt.textContent = parts.length > 0 ? parts.join(' | ') : '(empty)';
+        } else {
+          // Legacy: plain string entry
+          opt.textContent = String(entry || '').trim() || '(empty)';
+        }
 
-    if (roles.length === 0) {
-      const fallback = document.createElement('option');
-      fallback.value = '';
-      fallback.disabled = true;
-      fallback.textContent = '\u26a0\uFE0F No searches saved — add in popup';
-      selectEl.appendChild(fallback);
+        selectEl.appendChild(opt);
+      });
       return;
     }
 
-    roles.forEach(role => {
-      const opt = document.createElement('option');
-      opt.value = role;
-      opt.textContent = role;
-      selectEl.appendChild(opt);
-    });
+    // Ultimate fallback: comma-split targetRole.jobTitle
+    const rawRoles =
+      profile?.work?.targetRole?.jobTitle ||
+      profile?.work?.currentRole?.jobTitle || '';
+    const roles = String(rawRoles).split(',').map(r => r.trim()).filter(r => r.length > 0);
+
+    if (roles.length > 0) {
+      roles.forEach((role, idx) => {
+        const opt = document.createElement('option');
+        opt.value = String(idx);
+        opt.textContent = role;
+        selectEl.appendChild(opt);
+      });
+      return;
+    }
+
+    // Empty state
+    const fallback = document.createElement('option');
+    fallback.value = '';
+    fallback.disabled = true;
+    fallback.textContent = '\u26a0\uFE0F No searches saved \u2014 add in popup';
+    selectEl.appendChild(fallback);
   }
 
   /**

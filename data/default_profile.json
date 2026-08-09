@@ -32,9 +32,9 @@
     }
   },
   "savedSearches": [
-    "Senior Software Engineer",
-    "Full Stack Developer",
-    "React Developer"
+    { "role": "Senior Software Engineer", "location": "Bengaluru", "experience": "3" },
+    { "role": "Full Stack Developer",     "location": "Hyderabad", "experience": "2" },
+    { "role": "React Developer",          "location": "Remote",    "experience": "2" }
   ],
   "education": {
     "degree": "Bachelor of Technology",
