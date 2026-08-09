@@ -185,13 +185,6 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('yearsExperience').value = profile.work?.currentRole?.yearsExperience || '';
     document.getElementById('currentSalary').value = profile.work?.currentRole?.currentSalary || '';
 
-    // Target Role & Skills
-    document.getElementById('targetJobTitle').value = profile.work?.targetRole?.jobTitle || '';
-    document.getElementById('keySkills').value = profile.work?.targetRole?.keySkills || '';
-    document.getElementById('targetLocation').value = profile.work?.targetRole?.targetLocation || '';
-    document.getElementById('noticePeriod').value = profile.work?.targetRole?.noticePeriod || '';
-    document.getElementById('expectedSalary').value = profile.work?.targetRole?.expectedSalary || '';
-
     // Personal
     document.getElementById('fullName').value = profile.personal?.fullName || '';
     document.getElementById('firstName').value = profile.personal?.firstName || '';
@@ -366,8 +359,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const parsedDelay = parseInt(document.getElementById('stepDelayMs').value, 10);
     const currSalaryVal = document.getElementById('currentSalary').value.trim();
-    const expSalaryVal = document.getElementById('expectedSalary').value.trim();
-    const noticeVal = document.getElementById('noticePeriod').value.trim();
 
     // Saved Quick Searches — collect { role, location, experience } objects from blocks
     const searchBlocks = document.querySelectorAll('#saved-searches-container .search-block');
@@ -387,15 +378,6 @@ document.addEventListener('DOMContentLoaded', () => {
           yearsExperience: document.getElementById('yearsExperience').value.trim(),
           currentSalary: currSalaryVal,
           currentSalaryLakhs: currSalaryVal.replace(/[^0-9.]/g, '')
-        },
-        targetRole: {
-          jobTitle: document.getElementById('targetJobTitle').value.trim(),
-          keySkills: document.getElementById('keySkills').value.trim(),
-          targetLocation: document.getElementById('targetLocation').value.trim(),
-          noticePeriod: noticeVal,
-          noticePeriodDays: noticeVal.replace(/[^0-9]/g, '') || '30',
-          expectedSalary: expSalaryVal,
-          expectedSalaryLakhs: expSalaryVal.replace(/[^0-9.]/g, '')
         }
       },
       personal: {

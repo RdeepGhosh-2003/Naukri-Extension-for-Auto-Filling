@@ -812,7 +812,7 @@
         }
       }
 
-      // ── LOCATION field ───────────────────────────────────────────────────
+      // ── LOCATION field ────────────────────────────────────────────────────
       if (chosenLocation) {
         const locationInput =
           document.querySelector('input[placeholder*="location" i]') ||
@@ -825,17 +825,73 @@
         }
       }
 
-      // ── EXPERIENCE field ─────────────────────────────────────────────────
+      // ── EXPERIENCE field — click-simulation macro ─────────────────────────
+      // Naukri's Experience field is a custom React dropdown (not a plain text
+      // input). Typing into it via nativeInputValueSetter has no effect because
+      // the component manages its own closed state. Instead we:
+      //   1. Click the trigger element to open the dropdown list.
+      //   2. Wait ~150 ms for React to mount the <ul>/<li> items.
+      //   3. Find the <li> whose text matches the saved experience value.
+      //   4. Click it — this is the only way to register the selection.
       if (chosenExperience) {
-        const expInput =
-          document.querySelector('input[placeholder*="experience" i]') ||
-          document.querySelector('.experienceDD input')                ||
-          document.querySelector('#experienceInput')                   ||
-          document.querySelector('input[name="experience"]');
-        if (injectReactValue(expInput, chosenExperience)) {
-          console.log(`[Naukri SpeedFill] Experience filled: "${chosenExperience}"`);
+        // Find the experience trigger (the clickable wrapper, not an <input>)
+        const expTrigger =
+          document.querySelector('.experienceDD')                       ||
+          document.querySelector('[data-key="experience"]')             ||
+          document.querySelector('.exp-hide')                           ||
+          document.querySelector('input[placeholder*="experience" i]')  ||
+          document.querySelector('#experienceInput');
+
+        if (expTrigger) {
+          // Click to open Naukri's custom experience dropdown
+          expTrigger.click();
+          console.log('[Naukri SpeedFill] Clicked experience trigger, waiting for list...');
+
+          setTimeout(() => {
+            // Naukri renders the dropdown options as <li> or <span> inside a
+            // <ul> that appears in the DOM only after the click.
+            // We look broadly for list items inside any active dropdown overlay.
+            const listItems = document.querySelectorAll(
+              '.experienceDD li, .experienceDD .listItem, ' +
+              '.dropdown-list li, .customAutosuggest li, ' +
+              'ul.dropdown li, [class*="expDD"] li, ' +
+              '[data-key="experience"] li, .suggestor-container li'
+            );
+
+            if (listItems.length === 0) {
+              console.warn('[Naukri SpeedFill] Experience dropdown list did not render.');
+              return;
+            }
+
+            // Normalise the saved value: "3" → match "3 Year" / "3 Yrs" / "3+"
+            const targetNum = parseInt(chosenExperience, 10);
+            let matched = false;
+
+            listItems.forEach(item => {
+              if (matched) return;
+              const text = item.textContent.trim();
+              // Match "X Year", "X Yr", "X yrs", "X+ Year", or exact number
+              const itemNum = parseInt(text, 10);
+              if (
+                !isNaN(targetNum) &&
+                !isNaN(itemNum) &&
+                itemNum === targetNum
+              ) {
+                item.click();
+                matched = true;
+                console.log(`[Naukri SpeedFill] Experience selected: "${text}"`);
+              }
+            });
+
+            if (!matched) {
+              console.warn(`[Naukri SpeedFill] No experience list item matched "${chosenExperience}". Available: ${Array.from(listItems).map(i => i.textContent.trim()).join(', ')}`);
+              // Close the dropdown so it doesn't stay open
+              expTrigger.click();
+            }
+          }, 150);
+
         } else {
-          console.warn('[Naukri SpeedFill] Experience input not found (may not exist on this page).');
+          console.warn('[Naukri SpeedFill] Experience trigger element not found on this page.');
         }
       }
 

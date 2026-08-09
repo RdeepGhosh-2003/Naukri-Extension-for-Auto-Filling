@@ -20,15 +20,6 @@
       "yearsExperience": "3",
       "currentSalary": "1200000",
       "currentSalaryLakhs": "12"
-    },
-    "targetRole": {
-      "jobTitle": "Senior Software Engineer",
-      "targetLocation": "Bengaluru",
-      "expectedSalary": "1800000",
-      "expectedSalaryLakhs": "18",
-      "noticePeriod": "30 Days",
-      "noticePeriodDays": "30",
-      "keySkills": "JavaScript, React, Node.js, Python, TypeScript, HTML, CSS, REST APIs"
     }
   },
   "savedSearches": [
