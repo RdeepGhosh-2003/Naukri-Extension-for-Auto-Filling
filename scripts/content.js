@@ -807,7 +807,7 @@
         return true;
       }
 
-      // ── ROLE / KEYWORD field ─────────────────────────────────────────────
+      // ── STEP 1: Inject Text Fields (Role & Location Immediately) ───────────
       if (chosenRole) {
         const roleInput =
           document.querySelector('input[placeholder*="designation" i]') ||
@@ -825,7 +825,6 @@
         }
       }
 
-      // ── LOCATION field ────────────────────────────────────────────────────
       if (chosenLocation) {
         const locationInput =
           document.querySelector('input[placeholder*="location" i]') ||
@@ -838,50 +837,52 @@
         }
       }
 
-      // ── EXPERIENCE field — click-simulation macro ─────────────────────────
-      // Naukri's Experience field is a custom React dropdown (not a plain text
-      // input). Typing into it via nativeInputValueSetter has no effect because
-      // the component manages its own closed state. Instead we:
-      //   1. Click the trigger element to open the dropdown list.
-      //   2. Wait ~150 ms for React to mount the <ul>/<li> items.
-      //   3. Find the <li> whose text matches the saved experience value.
-      //   4. Click it — this is the only way to register the selection.
-      // ── EXPERIENCE field — React dropdown interaction macro ────────────────
+      // ── STEP 2: Trigger Experience Menu (Delay: 300ms) ────────────────────
       if (chosenExperience) {
-        const expInput = document.querySelector('input[placeholder*="experience" i]');
-        if (expInput) {
-          simulateHumanClick(expInput);
-          if (expInput.parentElement) simulateHumanClick(expInput.parentElement);
-          console.log('[Naukri SpeedFill] Simulated human click on experience input & parentElement.');
+        setTimeout(() => {
+          const expInput = document.querySelector('input[placeholder*="experience" i]');
+          if (expInput) {
+            simulateHumanClick(expInput);
+            if (expInput.parentElement) simulateHumanClick(expInput.parentElement);
+            console.log('[Naukri SpeedFill] Simulated human click on experience input & parentElement.');
 
-          const startTime = Date.now();
-          const expVal = String(chosenExperience).trim();
-          const targetText = expVal === '0' ? 'fresher' : `${expVal} year`;
-
-          const pollInterval = setInterval(() => {
-            // Find all visible elements on the page
-            const allVisibleElements = Array.from(document.querySelectorAll('*'))
-              .filter(el => el.getBoundingClientRect().height > 0);
-
-            // Find the specific list item leaf node
-            const matchedItem = allVisibleElements.find(el => {
-              const text = el.textContent.toLowerCase().trim();
-              return text.includes(targetText) && el.children.length === 0; // Ensures we only click the deepest element
-            });
-
-            if (matchedItem) {
-              simulateHumanClick(matchedItem);
-              clearInterval(pollInterval);
-              console.log(`[Naukri SpeedFill] Experience option leaf node clicked: "${matchedItem.textContent.trim()}"`);
-            } else if (Date.now() - startTime >= 3000) {
-              clearInterval(pollInterval);
-              console.warn(`[Naukri SpeedFill] Experience dropdown polling timed out for value "${chosenExperience}".`);
+            // ── STEP 3: Poll & Select Experience (Dynamic Wait: 100ms interval, 3000ms max) ──
+            const startTime = Date.now();
+            const expVal = String(chosenExperience).trim();
+            let targetText = '';
+            if (expVal === '0') {
+              targetText = 'fresher';
+            } else if (expVal === '1') {
+              targetText = '1 year';
+            } else {
+              targetText = `${expVal} years`;
             }
-          }, 50);
 
-        } else {
-          console.warn('[Naukri SpeedFill] Experience input not found on page.');
-        }
+            const pollInterval = setInterval(() => {
+              // Find all visible elements on the page
+              const allVisibleElements = Array.from(document.querySelectorAll('*'))
+                .filter(el => el.getBoundingClientRect().height > 0);
+
+              // Find the specific list item leaf node
+              const matchedItem = allVisibleElements.find(el => {
+                const text = el.textContent.toLowerCase().trim();
+                return text.includes(targetText.toLowerCase()) && el.children.length === 0; // Ensures we only click the deepest element
+              });
+
+              if (matchedItem) {
+                simulateHumanClick(matchedItem);
+                clearInterval(pollInterval);
+                console.log(`[Naukri SpeedFill] Experience option leaf node clicked: "${matchedItem.textContent.trim()}"`);
+              } else if (Date.now() - startTime >= 3000) {
+                clearInterval(pollInterval);
+                console.warn(`[Naukri SpeedFill] Experience dropdown polling timed out for value "${chosenExperience}".`);
+              }
+            }, 100);
+
+          } else {
+            console.warn('[Naukri SpeedFill] Experience input not found on page.');
+          }
+        }, 300);
       }
 
       // Flash wrapper to confirm selection
