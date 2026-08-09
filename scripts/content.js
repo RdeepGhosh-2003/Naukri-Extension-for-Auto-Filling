@@ -634,6 +634,48 @@
   }
 
   /**
+   * Lookup pre-saved or learned answer for a given question string
+   */
+  function getAnswerForQuestion(qText) {
+    if (!qText) return null;
+    const cleanQ = String(qText).toLowerCase().trim();
+
+    // 1. Built-in experience check
+    if (cleanQ.includes('experience') || cleanQ.includes('years') || cleanQ.includes('yr')) {
+      const exp = userProfile?.work?.currentRole?.yearsExperience ||
+                  (Array.isArray(userProfile?.savedSearches) && userProfile.savedSearches[0]?.experience);
+      if (exp) return exp;
+    }
+
+    // 2. Check learnedAnswers object
+    if (userProfile?.learnedAnswers && typeof userProfile.learnedAnswers === 'object') {
+      if (userProfile.learnedAnswers[cleanQ]) {
+        return userProfile.learnedAnswers[cleanQ];
+      }
+      for (const [key, val] of Object.entries(userProfile.learnedAnswers)) {
+        if (key && val && (cleanQ.includes(key.toLowerCase()) || key.toLowerCase().includes(cleanQ))) {
+          return val;
+        }
+      }
+    }
+
+    // 3. Check screening Q&A bank
+    if (Array.isArray(userProfile?.screening)) {
+      for (const item of userProfile.screening) {
+        if (!item || typeof item.keywords !== 'string') continue;
+        const keywords = item.keywords.toLowerCase().split(',').map(k => k.trim());
+        for (const kw of keywords) {
+          if (kw && cleanQ.includes(kw)) {
+            return item.answer;
+          }
+        }
+      }
+    }
+
+    return null;
+  }
+
+  /**
    * Core execution function: scan and fill all visible Naukri fields
    */
   function fillCurrentForm() {
@@ -642,7 +684,7 @@
       return 0;
     }
 
-    // ── Chatbot UI Support ──────────────────────────────────────────────────
+    // ── Chatbot UI Support & "Wait & Save" Mechanism ────────────────────────
     const chatInput = document.querySelector('input[placeholder*="Type message here" i]') ||
                       document.querySelector('input[placeholder*="type your answer" i]') ||
                       document.querySelector('input[placeholder*="type here" i]') ||
@@ -656,22 +698,26 @@
         .filter(el => el.offsetWidth > 0 && el.offsetHeight > 0 && el.textContent.trim().length > 0);
 
       if (messageElements.length > 0) {
-        questionText = messageElements[messageElements.length - 1].textContent.toLowerCase();
+        questionText = messageElements[messageElements.length - 1].textContent.toLowerCase().trim();
       } else {
         const container = chatInput.closest('[class*="chat" i], [class*="drawer" i], [class*="modal" i]') || document.body;
-        questionText = container.textContent.toLowerCase();
+        questionText = container.textContent.toLowerCase().trim();
       }
 
       console.log('[Naukri SpeedFill] Chatbot question detected:', questionText);
 
-      let answerValue = '';
-      if (questionText.includes('experience') || questionText.includes('years') || questionText.includes('yr')) {
-        answerValue = userProfile.work?.currentRole?.yearsExperience ||
-                      (Array.isArray(userProfile.savedSearches) && userProfile.savedSearches[0]?.experience) ||
-                      '0';
-      }
+      // Search for answer in user profile, learnedAnswers, or screening Q&A bank
+      const answerValue = getAnswerForQuestion(questionText);
+
+      const sendBtn = document.querySelector('button[class*="save" i], button[class*="send" i], .send-btn, .save-btn, [class*="sendBtn" i], [class*="saveBtn" i]') ||
+                      chatInput.parentElement?.querySelector('button') ||
+                      chatInput.closest('form, div[class*="chat" i], div[class*="drawer" i]')?.querySelector('button');
 
       if (answerValue) {
+        // MATCH FOUND: Auto-fill & auto-submit
+        chatInput.style.border = "";
+        chatInput.style.boxShadow = "";
+
         const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
           window.HTMLInputElement.prototype, 'value'
         )?.set;
@@ -683,18 +729,64 @@
           chatInput.dispatchEvent(new Event('change', { bubbles: true }));
           chatInput.classList.add('speedfill-highlight');
           setTimeout(() => chatInput.classList.remove('speedfill-highlight'), 2000);
-          console.log(`[Naukri SpeedFill] Chatbot UI: Injected answer "${answerValue}" into chat input.`);
+          console.log(`[Naukri SpeedFill] Chatbot UI: Auto-injected known answer "${answerValue}" for question "${questionText}".`);
         }
-
-        const sendBtn = document.querySelector('button[class*="save" i], button[class*="send" i], .send-btn, .save-btn, [class*="sendBtn" i], [class*="saveBtn" i]') ||
-                        chatInput.parentElement?.querySelector('button') ||
-                        chatInput.closest('form, div[class*="chat" i], div[class*="drawer" i]')?.querySelector('button');
 
         if (sendBtn) {
-          console.log('[Naukri SpeedFill] Chatbot UI: Clicking Save/Send button...');
-          setTimeout(() => sendBtn.click(), 100);
+          console.log('[Naukri SpeedFill] Chatbot UI: Auto-clicking Send/Save button...');
+          setTimeout(() => sendBtn.click(), 200);
         }
         return 1;
+
+      } else {
+        // UNKNOWN QUESTION (The Pause / Wait & Save):
+        // 1. ABORT auto-submit so the page doesn't try to proceed with empty data
+        console.warn(`[Naukri SpeedFill] Wait & Save: No pre-saved answer found for question "${questionText}". Halting automation.`);
+
+        // 2. Highlight input box with orange warning border to signal manual input required
+        chatInput.style.border = "2px solid #ff9800";
+        chatInput.style.boxShadow = "0 0 10px rgba(255, 152, 0, 0.5)";
+
+        // 3. Update status pill
+        const pill = document.getElementById('speedfill-floating-pill');
+        if (pill) {
+          pill.classList.add('pill-warning');
+          pill.innerHTML = `<span>🛑 Wait & Save: Manual Input Required</span>`;
+        }
+
+        // 4. Intercept & Capture when user clicks Save/Send button
+        if (sendBtn && !sendBtn.dataset.speedfillIntercepted) {
+          sendBtn.dataset.speedfillIntercepted = "true";
+          sendBtn.addEventListener('click', function captureUserAnswer() {
+            const enteredVal = chatInput.value ? chatInput.value.trim() : '';
+            if (enteredVal && questionText) {
+              console.log(`[Naukri SpeedFill] Wait & Save: Capturing user answer "${enteredVal}" for question "${questionText}"`);
+
+              if (!userProfile.learnedAnswers) userProfile.learnedAnswers = {};
+              userProfile.learnedAnswers[questionText] = enteredVal;
+
+              if (!Array.isArray(userProfile.screening)) userProfile.screening = [];
+              const existIdx = userProfile.screening.findIndex(s => s.keywords === questionText);
+              if (existIdx >= 0) {
+                userProfile.screening[existIdx].answer = enteredVal;
+              } else {
+                userProfile.screening.push({ keywords: questionText, answer: enteredVal });
+              }
+
+              chrome.storage.local.set({ userProfile: userProfile }, () => {
+                console.log('[Naukri SpeedFill] Successfully saved learned Q&A pair to Chrome storage.');
+                chatInput.style.border = "";
+                chatInput.style.boxShadow = "";
+                if (pill) {
+                  pill.classList.remove('pill-warning');
+                  pill.innerHTML = `<span>💾 Answer Saved!</span>`;
+                }
+              });
+            }
+          }, { capture: true, once: true });
+        }
+
+        return 0; // ABORT auto-submit and return early
       }
     }
     // ─────────────────────────────────────────────────────────────────────────

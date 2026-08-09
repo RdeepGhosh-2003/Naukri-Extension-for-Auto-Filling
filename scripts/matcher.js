@@ -295,6 +295,15 @@
       }
     }
 
+    // Check learnedAnswers object
+    if (profile.learnedAnswers && typeof profile.learnedAnswers === 'object') {
+      for (const [key, val] of Object.entries(profile.learnedAnswers)) {
+        if (key && val && (labelText.includes(key.toLowerCase()) || key.toLowerCase().includes(labelText))) {
+          return { value: val, confidence: 0.9, keyMatched: key };
+        }
+      }
+    }
+
     // Check screening Q&A bank
     if (profile.screening && Array.isArray(profile.screening)) {
       for (const item of profile.screening) {
