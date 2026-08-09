@@ -124,7 +124,7 @@
 
 #naukri-role-search-wrapper {
   position: fixed;
-  bottom: 160px;           /* sit well above the SpeedFill pill (which is at bottom:24px) */
+  top: 95px;             /* immediately below sticky header, above right-side ad banners */
   right: 24px;
   z-index: 999998;
   display: flex;
