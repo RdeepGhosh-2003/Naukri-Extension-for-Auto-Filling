@@ -12,6 +12,7 @@
   let currentJobTitle = 'Unknown Role';
   let currentCompany = 'Unknown Company';
   let _dropdownInjected = false; // hard one-shot guard — prevents MutationObserver loop
+  let forceHaltAutomation = false; // Master Kill Switch when missing data detected
 
   const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -497,7 +498,15 @@
   /**
    * Find and click final "Submit" / "Apply" button on Naukri
    */
+  /**
+   * Find and click final "Submit" / "Apply" button on Naukri
+   */
   function clickSubmitButton(containerArg) {
+    if (forceHaltAutomation && userProfile?.settings?.pauseOnUnmatchedFields !== false) {
+      console.warn('[Naukri SpeedFill] Master Kill Switch Active: Aborting clickSubmitButton.');
+      return false;
+    }
+
     const appContainer = containerArg || window.SpeedFillMatcher?.getAppContainer(document);
     if (!appContainer) return false;
 
@@ -584,6 +593,12 @@
     window._captchaMonitorInterval = setInterval(() => {
       detectCaptchaAndNotify();
 
+      if (forceHaltAutomation && userProfile?.settings?.pauseOnUnmatchedFields !== false) {
+        clearInterval(window._captchaMonitorInterval);
+        window._captchaMonitorInterval = null;
+        return;
+      }
+
       if (userProfile?.settings?.autoSubmitApplication !== false) {
         const appContainer = window.SpeedFillMatcher?.getAppContainer(document);
         if (!appContainer) return;
@@ -606,6 +621,11 @@
    */
   function clickContinueButton(containerArg) {
     clearTimeout(window._speedfillAdvanceTimer);
+    if (forceHaltAutomation && userProfile?.settings?.pauseOnUnmatchedFields !== false) {
+      console.warn('[Naukri SpeedFill] Master Kill Switch Active: Aborting clickContinueButton.');
+      return false;
+    }
+
     const appContainer = containerArg || window.SpeedFillMatcher?.getAppContainer(document);
     if (!appContainer) return false;
 
@@ -684,6 +704,8 @@
       return 0;
     }
 
+    forceHaltAutomation = false; // Reset at start of new form evaluation
+
     // ── Chatbot UI Support & "Wait & Save" Mechanism ────────────────────────
     const chatInput = document.querySelector('input[placeholder*="Type message here" i]') ||
                       document.querySelector('input[placeholder*="type your answer" i]') ||
@@ -735,14 +757,17 @@
           answerInjected = true;
         }
       } else {
-        // UNKNOWN QUESTION (Strict Execution Halting / Race Condition Fix):
+        // UNKNOWN QUESTION (Master Kill Switch Triggered):
         // 1. Kill all lingering timers & intervals to prevent accidental auto-submits
+        forceHaltAutomation = true;
         clearTimeout(window._speedfillSubmitTimer);
         clearTimeout(window._speedfillAdvanceTimer);
         if (window._captchaMonitorInterval) {
           clearInterval(window._captchaMonitorInterval);
           window._captchaMonitorInterval = null;
         }
+
+        console.warn('[Naukri SpeedFill] Master Kill Switch Triggered: Missing data detected. Aborting all auto-advance and auto-submit queues.');
 
         // 2. Highlight input box with orange warning border to signal manual input required
         chatInput.style.border = "2px solid #ff9800";
@@ -792,7 +817,7 @@
       }
 
       // ONLY execute click if the guard clause was passed and answer was successfully injected
-      if (answerInjected && sendBtn) {
+      if (answerInjected && sendBtn && !forceHaltAutomation) {
         console.log('[Naukri SpeedFill] Chatbot UI: Answer injected, auto-clicking Send/Save button with 500ms human delay...');
         setTimeout(() => sendBtn.click(), 500);
         return 1;
@@ -863,17 +888,29 @@
     const stepDelay = userProfile?.settings?.stepDelayMs !== undefined ? userProfile.settings.stepDelayMs : 150;
 
     if (unmatchedCount > 0 && userProfile?.settings?.pauseOnUnmatchedFields !== false) {
-      console.warn(`[Naukri SpeedFill] Pausing auto-advance: ${unmatchedCount} field(s) need manual input/dashboard entry.`);
+      forceHaltAutomation = true;
+      clearTimeout(window._speedfillSubmitTimer);
+      clearTimeout(window._speedfillAdvanceTimer);
+      if (window._captchaMonitorInterval) {
+        clearInterval(window._captchaMonitorInterval);
+        window._captchaMonitorInterval = null;
+      }
+      console.warn('[Naukri SpeedFill] Master Kill Switch Triggered: Missing data detected. Aborting all auto-advance and auto-submit queues.');
+      return filledCount;
+    }
+
+    if (forceHaltAutomation) {
+      console.warn('[Naukri SpeedFill] Master Kill Switch Active: Aborting auto-submit and auto-advance queues.');
       return filledCount;
     }
 
     if (userProfile?.settings?.autoSubmitApplication !== false) {
-      setTimeout(() => clickSubmitButton(appContainer), stepDelay);
+      window._speedfillSubmitTimer = setTimeout(() => clickSubmitButton(appContainer), stepDelay);
       monitorCaptchaAndSubmit();
     }
 
     if ((userProfile?.settings?.autoAdvanceStep !== false || handledResume) && (filledCount > 0 || handledResume)) {
-      setTimeout(() => clickContinueButton(appContainer), stepDelay);
+      window._speedfillAdvanceTimer = setTimeout(() => clickContinueButton(appContainer), stepDelay);
     }
 
     return filledCount;
