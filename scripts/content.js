@@ -835,77 +835,62 @@
       //   4. Click it — this is the only way to register the selection.
       // ── EXPERIENCE field — React dropdown interaction macro ────────────────
       if (chosenExperience) {
-        const expInput =
-          document.querySelector('input[placeholder*="experience" i]') ||
-          document.querySelector('.experienceDD input')                ||
-          document.querySelector('#experienceInput')                   ||
-          document.querySelector('.experienceDD');
-
+        const expInput = document.querySelector('input[placeholder*="experience" i]');
         if (expInput) {
-          // Aggressive Trigger: dispatch mousedown, pointerdown, click on both input and parentElement
-          const triggerTargets = [expInput];
-          if (expInput.parentElement) triggerTargets.push(expInput.parentElement);
+          // Standard clicks that bubble up to hit React's synthetic listener
+          expInput.click();
+          if (expInput.parentElement) expInput.parentElement.click();
+          console.log('[Naukri SpeedFill] Clicked experience input & parentElement.');
 
-          triggerTargets.forEach(target => {
-            ['mousedown', 'pointerdown', 'click'].forEach(evtType => {
-              target.dispatchEvent(new MouseEvent(evtType, { bubbles: true, cancelable: true, view: window }));
-            });
-          });
-          console.log('[Naukri SpeedFill] Triggered experience dropdown opening events.');
-
-          // Dynamic Polling (Wait for Render): 50ms interval, timeout after 1500ms
           const startTime = Date.now();
           const expVal = String(chosenExperience).trim();
 
+          // Format target string based on expVal
+          let targetText = '';
+          if (expVal === '0' || expVal.toLowerCase() === 'fresher') {
+            targetText = 'fresher (less than 1 year)';
+          } else if (expVal === '1') {
+            targetText = '1 year';
+          } else {
+            targetText = `${expVal} years`;
+          }
+
           const pollInterval = setInterval(() => {
-            const listItems = document.querySelectorAll(
-              '.dropdown li, .dropdown span, ' +
-              '.nI-gNb-sb__dropdown li, .nI-gNb-sb__dropdown span, ' +
-              '.experienceDD li, .experienceDD span, ' +
-              '.dropdown-list li, .dropdown-list span, ' +
-              '[class*="expDD"] li, [class*="expDD"] span, ' +
-              'ul.dropdown li, .customAutosuggest li, .suggestor-container li'
-            );
+            // Massive, catch-all DOM polling selector
+            const listItems = Array.from(document.querySelectorAll(
+              'li, ul > div, div[class*="list" i], div[class*="dropdown" i] > div, div[class*="suggester" i] span, span'
+            ));
 
-            let matchedElement = null;
+            const targetLower = targetText.toLowerCase();
 
-            for (const item of listItems) {
-              const text = item.textContent.trim().toLowerCase();
-              if (expVal === '0' || expVal.toLowerCase() === 'fresher') {
-                if (text.includes('fresher')) {
-                  matchedElement = item;
-                  break;
-                }
-              } else {
-                if (
-                  text.includes(`${expVal} year`) ||
-                  text.includes(`${expVal} yr`)   ||
-                  text === `${expVal} y`         ||
-                  text === expVal
-                ) {
-                  matchedElement = item;
-                  break;
-                }
-              }
-            }
+            // Locate element matching target string EXACTLY (case-insensitive) AND visible
+            let matchedElement = listItems.find(el => {
+              const isVisible = el.getBoundingClientRect().height > 0;
+              if (!isVisible) return false;
+              const text = el.textContent.trim().toLowerCase();
+              return text === targetLower;
+            });
 
-            // Fallback match if exact `${expVal} year` wasn't matched yet
-            if (!matchedElement && expVal !== '0' && expVal.toLowerCase() !== 'fresher') {
-              for (const item of listItems) {
-                const text = item.textContent.trim().toLowerCase();
-                if (text.includes(expVal)) {
-                  matchedElement = item;
-                  break;
+            // Flexible fallback match if exact full string wasn't found
+            if (!matchedElement) {
+              matchedElement = listItems.find(el => {
+                const isVisible = el.getBoundingClientRect().height > 0;
+                if (!isVisible) return false;
+                const text = el.textContent.trim().toLowerCase();
+                if (expVal === '0' || expVal.toLowerCase() === 'fresher') {
+                  return text.includes('fresher');
+                } else if (expVal === '1') {
+                  return text.includes('1 year') || text.includes('1 yr') || text === '1';
+                } else {
+                  return text.includes(`${expVal} year`) || text.includes(`${expVal} yr`) || text === expVal;
                 }
-              }
+              });
             }
 
             if (matchedElement) {
+              matchedElement.click();
               clearInterval(pollInterval);
-              ['mousedown', 'pointerdown', 'click'].forEach(evtType => {
-                matchedElement.dispatchEvent(new MouseEvent(evtType, { bubbles: true, cancelable: true, view: window }));
-              });
-              console.log(`[Naukri SpeedFill] Experience option selected: "${matchedElement.textContent.trim()}"`);
+              console.log(`[Naukri SpeedFill] Experience option clicked: "${matchedElement.textContent.trim()}"`);
             } else if (Date.now() - startTime >= 1500) {
               clearInterval(pollInterval);
               console.warn(`[Naukri SpeedFill] Experience dropdown polling timed out for value "${chosenExperience}".`);
