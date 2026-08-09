@@ -822,8 +822,12 @@
         }
 
         // ALL DOM queries strictly inside setTimeout after 600ms delay:
-        // Helper: Auto-submit search after fields have populated
+        // Helper: Auto-submit search after fields have populated (with human-like delay to evade bot detection)
         function triggerFinalSearch() {
+          // Generate a random delay between 1.5 and 2.5 seconds to mimic human reaction time
+          const humanDelay = Math.floor(Math.random() * (2500 - 1500 + 1)) + 1500;
+          console.log(`[Naukri SpeedFill] Waiting ${humanDelay}ms to evade bot detection...`);
+
           setTimeout(() => {
             const searchBtn = document.querySelector(
               '.qsbSubmit, #ni-gnb-searchbar button, .nI-gNb-sb__icon-wrapper, ' +
@@ -835,7 +839,7 @@
             } else {
               console.warn('[Naukri SpeedFill] Could not find the Search button to auto-submit.');
             }
-          }, 300);
+          }, humanDelay);
         }
 
         // ── STEP 1: Inject Text Fields (Role & Location) ─────────────────────
