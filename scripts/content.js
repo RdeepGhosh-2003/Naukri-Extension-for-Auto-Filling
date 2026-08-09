@@ -790,155 +790,169 @@
       const chosenLocation   = String(searchData.location   || '').trim();
       const chosenExperience = String(searchData.experience || '').trim();
 
-      if (!chosenRole && !chosenLocation && !chosenExperience) return;
+      // ── STEP 0: Wake Up Search Bar ─────────────────────────────────────────
+      // Dispatch simulateHumanClick on search bar wrapper/input to force Naukri's
+      // React state to transition from inactive to active/expanded.
+      const searchBarWrapper =
+        document.querySelector('.qsb') ||
+        document.querySelector('.nI-gNb-sb__wrapper') ||
+        document.querySelector('.nMainNavbar') ||
+        document.querySelector('input[placeholder*="Search jobs here" i]') ||
+        document.querySelector('input[placeholder*="designation" i]') ||
+        document.querySelector('input[placeholder*="keyword" i]');
 
-      // Native React setter — bypasses React's synthetic state wrapper.
-      // Direct assignment (.value = x) is intercepted and ignored by React.
-      const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
-        window.HTMLInputElement.prototype, 'value'
-      ).set;
-
-      // Helper: focus + native-set + dispatch events for one input field
-      function injectReactValue(input, value) {
-        if (!input || !value) return false;
-        input.focus();
-        nativeInputValueSetter.call(input, value);
-        input.dispatchEvent(new Event('input',  { bubbles: true }));
-        input.dispatchEvent(new Event('change', { bubbles: true }));
-        input.classList.add('speedfill-highlight');
-        setTimeout(() => input.classList.remove('speedfill-highlight'), 2000);
-        return true;
+      if (searchBarWrapper) {
+        simulateHumanClick(searchBarWrapper);
+        console.log('[Naukri SpeedFill] Step 0: Woke up search bar wrapper.');
+      } else {
+        console.warn('[Naukri SpeedFill] Step 0: Search bar wrapper not found.');
       }
 
-      // ── STEP 1: Inject Text Fields (Role & Location Immediately) ───────────
-      if (chosenRole) {
-        const roleInput =
-          document.querySelector('input[placeholder*="designation" i]') ||
-          document.querySelector('input[placeholder*="keyword" i]')     ||
-          document.querySelector('.qsb input')                          ||
-          document.querySelector('input[placeholder*="Search jobs here" i]') ||
-          document.querySelector('.suggestor-input')                    ||
-          document.querySelector('.nI-gNb-sb__wrapper input')           ||
-          document.querySelector('#qsb-keys-sug')                       ||
-          document.querySelector('input[name="qp"]');
-        if (injectReactValue(roleInput, chosenRole)) {
-          console.log(`[Naukri SpeedFill] Role filled: "${chosenRole}"`);
-        } else {
-          console.warn('[Naukri SpeedFill] Role input not found.');
+      // ── STEP 1 - STEP 3: Delayed Execution (350ms for React mount) ─────────
+      setTimeout(() => {
+        // Native React setter — bypasses React's synthetic state wrapper.
+        const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+          window.HTMLInputElement.prototype, 'value'
+        )?.set;
+
+        // Helper: focus + native-set + dispatch events for one input field
+        function injectReactValue(input, value) {
+          if (!input || !value || !nativeInputValueSetter) return false;
+          input.focus();
+          nativeInputValueSetter.call(input, value);
+          input.dispatchEvent(new Event('input',  { bubbles: true }));
+          input.dispatchEvent(new Event('change', { bubbles: true }));
+          input.classList.add('speedfill-highlight');
+          setTimeout(() => input.classList.remove('speedfill-highlight'), 2000);
+          return true;
         }
-      }
 
-      if (chosenLocation) {
-        const locationInput =
-          document.querySelector('input[placeholder*="location" i]') ||
-          document.querySelector('#qsb-location-sug')               ||
-          document.querySelector('input[name="ql"]');
-        if (injectReactValue(locationInput, chosenLocation)) {
-          console.log(`[Naukri SpeedFill] Location filled: "${chosenLocation}"`);
-        } else {
-          console.warn('[Naukri SpeedFill] Location input not found.');
-        }
-      }
-
-      // ── STEP 2: Trigger Experience Menu (Delay: 300ms) ────────────────────
-      if (chosenExperience) {
-        setTimeout(() => {
-          const expInput = document.querySelector('input[placeholder*="experience" i]') ||
-                           document.querySelector('.experienceDD input')                ||
-                           document.querySelector('.experienceDD')                      ||
-                           document.querySelector('#experienceDD')                      ||
-                           document.querySelector('.qsbExperience')                     ||
-                           document.querySelector('input[name="experience"]')            ||
-                           // Fallback: Find the dropdown wrapper between keyword and location
-                           document.querySelector('.nI-gNb-sb__wrapper > div:nth-child(2) input, .nI-gNb-sb__wrapper > div:nth-child(2)');
-
-          if (expInput) {
-            const expVal = String(chosenExperience).trim();
-            let targetText = '';
-            if (expVal === '0') {
-              targetText = 'fresher';
-            } else if (expVal === '1') {
-              targetText = '1 year';
-            } else {
-              targetText = `${expVal} years`;
-            }
-
-            // Value Check (Bypass if Match): If input already displays the target value, skip click and poll
-            const currentExpVal = (expInput.value || expInput.getAttribute('value') || expInput.textContent || expInput.parentElement?.textContent || '').toLowerCase();
-
-            if (
-              (expVal === '0' && currentExpVal.includes('fresher')) ||
-              (expVal !== '0' && (currentExpVal.includes(`${expVal} year`) || currentExpVal.includes(`${expVal} yr`) || currentExpVal.includes(targetText)))
-            ) {
-              console.log(`[Naukri SpeedFill] Experience field already matches "${targetText}", skipping update.`);
-              return;
-            }
-
-            // React State Reset (The Clear Button): Reset state if a clear icon exists
-            const parent = expInput.parentElement;
-            if (parent) {
-              const clearBtn = parent.querySelector('svg, .crossIcon, .clear-icon, .icon-close, [class*="clear" i], [class*="cross" i], [class*="close" i]');
-              if (clearBtn) {
-                console.log('[Naukri SpeedFill] Found Experience clear icon, resetting React state...');
-                simulateHumanClick(clearBtn);
-              }
-            }
-
-            simulateHumanClick(expInput);
-            if (expInput.parentElement) simulateHumanClick(expInput.parentElement);
-            console.log('[Naukri SpeedFill] Simulated human click on experience input & parentElement.');
-
-            // ── STEP 3: Poll & Select Experience (Dynamic Wait: 100ms interval, 3000ms max) ──
-            const startTime = Date.now();
-            console.log('[Naukri SpeedFill] Looking for experience:', targetText);
-
-            window.expPollInterval = setInterval(() => {
-              // Portal-Safe DOM Polling: query list items globally across portal layers, excluding input elements
-              const listItems = Array.from(document.querySelectorAll('li, div[class*="dropdown" i] span, div[class*="layer" i] span'))
-                .filter(el => el.tagName !== 'INPUT' && el.getBoundingClientRect().height > 0);
-
-              // Find the specific list item leaf node
-              const matchedItem = listItems.find(el => {
-                const text = el.textContent.toLowerCase().trim();
-                const isLeafNode = el.children.length === 0;
-
-                if (!isLeafNode) return false;
-
-                if (expVal === '0') {
-                  return text.includes('fresher');
-                } else {
-                  // Must include the target year, but CANNOT include "fresher" or "less than"
-                  // Using startsWith prevents '1 year' from matching '11 years' or '21 years'
-                  return text.startsWith(`${expVal} year`) && !text.includes('less than') && !text.includes('fresher');
-                }
-              });
-
-              if (matchedItem) {
-                console.log('[Naukri SpeedFill] Found match:', matchedItem.textContent);
-                simulateHumanClick(matchedItem);
-                clearInterval(window.expPollInterval);
-                window.expPollInterval = null;
-              } else if (Date.now() - startTime >= 3000) {
-                clearInterval(window.expPollInterval);
-                window.expPollInterval = null;
-                console.warn(`[Naukri SpeedFill] Experience dropdown polling timed out for value "${chosenExperience}".`);
-              }
-            }, 100);
-
+        // ── STEP 1: Inject Text Fields (Role & Location) ─────────────────────
+        if (chosenRole) {
+          const roleInput =
+            document.querySelector('input[placeholder*="designation" i]') ||
+            document.querySelector('input[placeholder*="keyword" i]')     ||
+            document.querySelector('.qsb input')                          ||
+            document.querySelector('input[placeholder*="Search jobs here" i]') ||
+            document.querySelector('.suggestor-input')                    ||
+            document.querySelector('.nI-gNb-sb__wrapper input')           ||
+            document.querySelector('#qsb-keys-sug')                       ||
+            document.querySelector('input[name="qp"]');
+          if (roleInput) {
+            injectReactValue(roleInput, chosenRole);
+            console.log(`[Naukri SpeedFill] Step 1: Role filled: "${chosenRole}"`);
           } else {
-            console.warn('[Naukri SpeedFill] Experience input not found on page.');
+            console.warn('[Naukri SpeedFill] Step 1: Role input not found.');
           }
-        }, 300);
-      }
+        }
 
-      // Flash wrapper to confirm selection
-      wrapper.classList.add('naukri-role-search-wrapper--active');
-      setTimeout(() => wrapper.classList.remove('naukri-role-search-wrapper--active'), 600);
+        if (chosenLocation) {
+          const locationInput =
+            document.querySelector('input[placeholder*="location" i]') ||
+            document.querySelector('#qsb-location-sug')               ||
+            document.querySelector('input[name="ql"]');
+          if (locationInput) {
+            injectReactValue(locationInput, chosenLocation);
+            console.log(`[Naukri SpeedFill] Step 1: Location filled: "${chosenLocation}"`);
+          } else {
+            console.warn('[Naukri SpeedFill] Step 1: Location input not found.');
+          }
+        }
 
-      // Reset dropdown to placeholder after brief delay
-      setTimeout(() => { select.value = ''; }, 800);
+        // ── STEP 2: Trigger Experience Menu (Delay: 300ms after Step 1) ─────
+        if (chosenExperience) {
+          setTimeout(() => {
+            const expInput = document.querySelector('input[placeholder*="experience" i]') ||
+                             document.querySelector('.experienceDD input')                ||
+                             document.querySelector('.experienceDD')                      ||
+                             document.querySelector('#experienceDD')                      ||
+                             document.querySelector('.qsbExperience')                     ||
+                             document.querySelector('input[name="experience"]')            ||
+                             document.querySelector('.nI-gNb-sb__wrapper > div:nth-child(2) input, .nI-gNb-sb__wrapper > div:nth-child(2)');
 
-      console.log(`[Naukri SpeedFill] Quick Search: Role="${chosenRole}" | Location="${chosenLocation}" | Exp="${chosenExperience}"`);
+            if (expInput) {
+              const expVal = String(chosenExperience).trim();
+              let targetText = '';
+              if (expVal === '0') {
+                targetText = 'fresher';
+              } else if (expVal === '1') {
+                targetText = '1 year';
+              } else {
+                targetText = `${expVal} years`;
+              }
+
+              // Value Check (Bypass if Match): If input already displays the target value, skip click and poll
+              const currentExpVal = (expInput.value || expInput.getAttribute('value') || expInput.textContent || expInput.parentElement?.textContent || '').toLowerCase();
+              if (
+                (expVal === '0' && currentExpVal.includes('fresher')) ||
+                (expVal !== '0' && (currentExpVal.includes(`${expVal} year`) || currentExpVal.includes(`${expVal} yr`) || currentExpVal.includes(targetText)))
+              ) {
+                console.log(`[Naukri SpeedFill] Experience field already matches "${targetText}", skipping update.`);
+                return;
+              }
+
+              // React State Reset (The Clear Button): Reset state if a clear icon exists
+              const parent = expInput.parentElement;
+              if (parent) {
+                const clearBtn = parent.querySelector('svg, .crossIcon, .clear-icon, .icon-close, [class*="clear" i], [class*="cross" i], [class*="close" i]');
+                if (clearBtn) {
+                  console.log('[Naukri SpeedFill] Found Experience clear icon, resetting React state...');
+                  simulateHumanClick(clearBtn);
+                }
+              }
+
+              simulateHumanClick(expInput);
+              if (expInput.parentElement) simulateHumanClick(expInput.parentElement);
+              console.log('[Naukri SpeedFill] Step 2: Simulated human click on experience input & parentElement.');
+
+              // ── STEP 3: Poll & Select Experience (Dynamic Wait: 100ms interval, 3000ms max) ──
+              const startTime = Date.now();
+              console.log('[Naukri SpeedFill] Step 3: Looking for experience:', targetText);
+
+              window.expPollInterval = setInterval(() => {
+                const listItems = Array.from(document.querySelectorAll('li, div[class*="dropdown" i] span, div[class*="layer" i] span'))
+                  .filter(el => el.tagName !== 'INPUT' && el.getBoundingClientRect().height > 0);
+
+                const matchedItem = listItems.find(el => {
+                  const text = el.textContent.toLowerCase().trim();
+                  const isLeafNode = el.children.length === 0;
+
+                  if (!isLeafNode) return false;
+
+                  if (expVal === '0') {
+                    return text.includes('fresher');
+                  } else {
+                    return text.startsWith(`${expVal} year`) && !text.includes('less than') && !text.includes('fresher');
+                  }
+                });
+
+                if (matchedItem) {
+                  console.log('[Naukri SpeedFill] Step 3: Found match:', matchedItem.textContent);
+                  simulateHumanClick(matchedItem);
+                  clearInterval(window.expPollInterval);
+                  window.expPollInterval = null;
+                } else if (Date.now() - startTime >= 3000) {
+                  clearInterval(window.expPollInterval);
+                  window.expPollInterval = null;
+                  console.warn(`[Naukri SpeedFill] Step 3: Experience dropdown polling timed out for value "${chosenExperience}".`);
+                }
+              }, 100);
+
+            } else {
+              console.warn('[Naukri SpeedFill] Step 2: Experience input not found on page.');
+            }
+          }, 300);
+        }
+
+        // Flash wrapper to confirm selection
+        wrapper.classList.add('naukri-role-search-wrapper--active');
+        setTimeout(() => wrapper.classList.remove('naukri-role-search-wrapper--active'), 600);
+
+        // Reset dropdown to placeholder after brief delay
+        setTimeout(() => { select.value = ''; }, 800);
+
+        console.log(`[Naukri SpeedFill] Quick Search: Role="${chosenRole}" | Location="${chosenLocation}" | Exp="${chosenExperience}"`);
+      }, 350);
     });
 
     wrapper.appendChild(select);
