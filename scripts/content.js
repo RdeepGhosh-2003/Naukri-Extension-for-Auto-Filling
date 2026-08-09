@@ -897,12 +897,19 @@
               const listItems = Array.from(document.querySelectorAll('li, div[class*="dropdown" i] span, div[class*="layer" i] span'))
                 .filter(el => el.tagName !== 'INPUT' && el.getBoundingClientRect().height > 0);
 
-              const targetLower = targetText.toLowerCase();
-
               // Find the specific list item leaf node
               const matchedItem = listItems.find(el => {
                 const text = el.textContent.toLowerCase().trim();
-                return text.includes(targetLower) && el.children.length === 0;
+                const isLeafNode = el.children.length === 0;
+
+                if (!isLeafNode) return false;
+
+                if (expVal === '0') {
+                  return text.includes('fresher');
+                } else {
+                  // Must include the year string, but CANNOT include "fresher"
+                  return text.includes(`${expVal} year`) && !text.includes('fresher');
+                }
               });
 
               if (matchedItem) {
