@@ -843,14 +843,10 @@
       // ── STEP 2: Trigger Experience Menu (Delay: 300ms) ────────────────────
       if (chosenExperience) {
         setTimeout(() => {
-          const expInput = document.querySelector('input[placeholder*="experience" i]');
+          const expInput = document.querySelector('input[placeholder*="experience" i]') ||
+                           document.querySelector('.experienceDD input') ||
+                           document.querySelector('#experienceInput');
           if (expInput) {
-            simulateHumanClick(expInput);
-            if (expInput.parentElement) simulateHumanClick(expInput.parentElement);
-            console.log('[Naukri SpeedFill] Simulated human click on experience input & parentElement.');
-
-            // ── STEP 3: Poll & Select Experience (Dynamic Wait: 100ms interval, 3000ms max) ──
-            const startTime = Date.now();
             const expVal = String(chosenExperience).trim();
             let targetText = '';
             if (expVal === '0') {
@@ -861,34 +857,52 @@
               targetText = `${expVal} years`;
             }
 
+            // Value Check (Bypass if Match): If input already displays the target value, skip click and poll
+            const currentExpVal = (expInput.value || expInput.getAttribute('value') || expInput.parentElement?.textContent || '').toLowerCase();
+            if (
+              (expVal === '0' && currentExpVal.includes('fresher')) ||
+              (expVal !== '0' && (currentExpVal.includes(`${expVal} year`) || currentExpVal.includes(`${expVal} yr`) || currentExpVal.includes(targetText)))
+            ) {
+              console.log(`[Naukri SpeedFill] Experience field already matches "${targetText}", skipping update.`);
+              return;
+            }
+
+            // React State Reset (The Clear Button): Reset state if a clear icon exists
+            const parent = expInput.parentElement;
+            if (parent) {
+              const clearBtn = parent.querySelector('svg, .crossIcon, .clear-icon, .icon-close, [class*="clear" i], [class*="cross" i], [class*="close" i]');
+              if (clearBtn) {
+                console.log('[Naukri SpeedFill] Found Experience clear icon, resetting React state...');
+                simulateHumanClick(clearBtn);
+              }
+            }
+
+            simulateHumanClick(expInput);
+            if (expInput.parentElement) simulateHumanClick(expInput.parentElement);
+            console.log('[Naukri SpeedFill] Simulated human click on experience input & parentElement.');
+
+            // ── STEP 3: Poll & Select Experience (Dynamic Wait: 100ms interval, 3000ms max) ──
+            const startTime = Date.now();
+            console.log('[Naukri SpeedFill] Looking for experience:', targetText);
+
             window.expPollInterval = setInterval(() => {
-              // Strictly target dropdown container list items to avoid matching input fields or page text
-              const candidateItems = Array.from(document.querySelectorAll(
-                '.experienceDD ul li, .nI-gNb-sb__dropdown li, .suggester-layer li, ' +
-                '.experienceDD li, .dropdown-list li, .customAutosuggest li, .suggestor-container li'
-              ));
+              // Portal-Safe DOM Polling: query list items globally across portal layers, excluding input elements
+              const listItems = Array.from(document.querySelectorAll('li, div[class*="dropdown" i] span, div[class*="layer" i] span'))
+                .filter(el => el.tagName !== 'INPUT' && el.getBoundingClientRect().height > 0);
 
-              const searchElements = candidateItems.length > 0
-                ? candidateItems
-                : Array.from(document.querySelectorAll('*')).filter(el => {
-                    const tag = el.tagName.toLowerCase();
-                    return tag !== 'input' && tag !== 'textarea' && tag !== 'select' && el.getBoundingClientRect().height > 0;
-                  });
+              const targetLower = targetText.toLowerCase();
 
-              // Find the specific list item leaf node excluding input fields
-              const matchedItem = searchElements.find(el => {
-                const tag = el.tagName.toLowerCase();
-                if (tag === 'input' || tag === 'textarea' || tag === 'select' || el.closest('input')) return false;
-
+              // Find the specific list item leaf node
+              const matchedItem = listItems.find(el => {
                 const text = el.textContent.toLowerCase().trim();
-                return text.includes(targetText.toLowerCase()) && el.children.length === 0;
+                return text.includes(targetLower) && el.children.length === 0;
               });
 
               if (matchedItem) {
+                console.log('[Naukri SpeedFill] Found match:', matchedItem.textContent);
                 simulateHumanClick(matchedItem);
                 clearInterval(window.expPollInterval);
                 window.expPollInterval = null;
-                console.log(`[Naukri SpeedFill] Experience option leaf node clicked: "${matchedItem.textContent.trim()}"`);
               } else if (Date.now() - startTime >= 3000) {
                 clearInterval(window.expPollInterval);
                 window.expPollInterval = null;
