@@ -770,22 +770,25 @@
 
     // --- onChange handler: fill Role + Location + Experience in Naukri search bar ---
     select.addEventListener('change', (e) => {
-      const chosenIdx = parseInt(e.target.value, 10);
-      if (isNaN(chosenIdx)) return;
-
-      // Look up the full search object from the profile by index
-      const profile = userProfile;
-      const searches = Array.isArray(profile?.savedSearches) ? profile.savedSearches : [];
-      const entry = searches[chosenIdx];
-
-      let chosenRole = '', chosenLocation = '', chosenExperience = '';
-      if (entry && typeof entry === 'object') {
-        chosenRole       = String(entry.role       || '').trim();
-        chosenLocation   = String(entry.location   || '').trim();
-        chosenExperience = String(entry.experience || '').trim();
-      } else if (typeof entry === 'string') {
-        chosenRole = entry.trim(); // legacy string format fallback
+      // Clear any existing experience polling interval to avoid race conditions on rapid/subsequent selections
+      if (window.expPollInterval) {
+        clearInterval(window.expPollInterval);
+        window.expPollInterval = null;
       }
+
+      if (!e.target.value) return;
+
+      let searchData = {};
+      try {
+        searchData = JSON.parse(e.target.value);
+      } catch (err) {
+        console.error('[Naukri SpeedFill] Error parsing dropdown JSON option value:', err);
+        return;
+      }
+
+      const chosenRole       = String(searchData.role       || '').trim();
+      const chosenLocation   = String(searchData.location   || '').trim();
+      const chosenExperience = String(searchData.experience || '').trim();
 
       if (!chosenRole && !chosenLocation && !chosenExperience) return;
 
@@ -858,23 +861,37 @@
               targetText = `${expVal} years`;
             }
 
-            const pollInterval = setInterval(() => {
-              // Find all visible elements on the page
-              const allVisibleElements = Array.from(document.querySelectorAll('*'))
-                .filter(el => el.getBoundingClientRect().height > 0);
+            window.expPollInterval = setInterval(() => {
+              // Strictly target dropdown container list items to avoid matching input fields or page text
+              const candidateItems = Array.from(document.querySelectorAll(
+                '.experienceDD ul li, .nI-gNb-sb__dropdown li, .suggester-layer li, ' +
+                '.experienceDD li, .dropdown-list li, .customAutosuggest li, .suggestor-container li'
+              ));
 
-              // Find the specific list item leaf node
-              const matchedItem = allVisibleElements.find(el => {
+              const searchElements = candidateItems.length > 0
+                ? candidateItems
+                : Array.from(document.querySelectorAll('*')).filter(el => {
+                    const tag = el.tagName.toLowerCase();
+                    return tag !== 'input' && tag !== 'textarea' && tag !== 'select' && el.getBoundingClientRect().height > 0;
+                  });
+
+              // Find the specific list item leaf node excluding input fields
+              const matchedItem = searchElements.find(el => {
+                const tag = el.tagName.toLowerCase();
+                if (tag === 'input' || tag === 'textarea' || tag === 'select' || el.closest('input')) return false;
+
                 const text = el.textContent.toLowerCase().trim();
-                return text.includes(targetText.toLowerCase()) && el.children.length === 0; // Ensures we only click the deepest element
+                return text.includes(targetText.toLowerCase()) && el.children.length === 0;
               });
 
               if (matchedItem) {
                 simulateHumanClick(matchedItem);
-                clearInterval(pollInterval);
+                clearInterval(window.expPollInterval);
+                window.expPollInterval = null;
                 console.log(`[Naukri SpeedFill] Experience option leaf node clicked: "${matchedItem.textContent.trim()}"`);
               } else if (Date.now() - startTime >= 3000) {
-                clearInterval(pollInterval);
+                clearInterval(window.expPollInterval);
+                window.expPollInterval = null;
                 console.warn(`[Naukri SpeedFill] Experience dropdown polling timed out for value "${chosenExperience}".`);
               }
             }, 100);
@@ -903,7 +920,7 @@
   /**
    * Populate (or refresh) the role options inside the dropdown.
    * Reads savedSearches[] — array of { role, location, experience } objects.
-   * option.value  = array index (used by change handler to look up full object)
+   * option.value  = JSON.stringify({ role, location, experience })
    * option.text   = "Data Analyst | Bengaluru | 2 Yr"
    * Falls back to comma-split targetRole.jobTitle for backward compatibility.
    */
@@ -917,11 +934,16 @@
     const searches = Array.isArray(profile?.savedSearches) ? profile.savedSearches : [];
 
     if (searches.length > 0) {
-      searches.forEach((entry, idx) => {
+      searches.forEach((entry) => {
         const opt = document.createElement('option');
-        opt.value = String(idx); // index — looked up in change handler
 
         if (entry && typeof entry === 'object') {
+          opt.value = JSON.stringify({
+            role:       String(entry.role       || '').trim(),
+            location:   String(entry.location   || '').trim(),
+            experience: String(entry.experience || '').trim()
+          });
+
           const parts = [];
           if (entry.role)       parts.push(String(entry.role).trim());
           if (entry.location)   parts.push(String(entry.location).trim());
@@ -929,7 +951,9 @@
           opt.textContent = parts.length > 0 ? parts.join(' | ') : '(empty)';
         } else {
           // Legacy: plain string entry
-          opt.textContent = String(entry || '').trim() || '(empty)';
+          const roleStr = String(entry || '').trim();
+          opt.value = JSON.stringify({ role: roleStr, location: '', experience: '' });
+          opt.textContent = roleStr || '(empty)';
         }
 
         selectEl.appendChild(opt);
@@ -944,9 +968,9 @@
     const roles = String(rawRoles).split(',').map(r => r.trim()).filter(r => r.length > 0);
 
     if (roles.length > 0) {
-      roles.forEach((role, idx) => {
+      roles.forEach((role) => {
         const opt = document.createElement('option');
-        opt.value = String(idx);
+        opt.value = JSON.stringify({ role, location: '', experience: '' });
         opt.textContent = role;
         selectEl.appendChild(opt);
       });
