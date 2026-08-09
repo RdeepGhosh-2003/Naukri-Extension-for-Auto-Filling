@@ -790,25 +790,25 @@
       const chosenLocation   = String(searchData.location   || '').trim();
       const chosenExperience = String(searchData.experience || '').trim();
 
-      // ── STEP 0: Wake Up Search Bar ─────────────────────────────────────────
-      // Dispatch simulateHumanClick on search bar wrapper/input to force Naukri's
-      // React state to transition from inactive to active/expanded.
+      // ── STEP 0: Gentle Wake Up Search Bar ─────────────────────────────────
+      // Use native .click() on the search bar wrapper to trigger expansion
+      // gently without overwhelming React's synthetic event queue.
       const searchBarWrapper =
-        document.querySelector('.qsb') ||
         document.querySelector('.nI-gNb-sb__wrapper') ||
+        document.querySelector('.qsb') ||
         document.querySelector('.nMainNavbar') ||
         document.querySelector('input[placeholder*="Search jobs here" i]') ||
         document.querySelector('input[placeholder*="designation" i]') ||
         document.querySelector('input[placeholder*="keyword" i]');
 
       if (searchBarWrapper) {
-        simulateHumanClick(searchBarWrapper);
-        console.log('[Naukri SpeedFill] Step 0: Woke up search bar wrapper.');
+        searchBarWrapper.click();
+        console.log('[Naukri SpeedFill] Step 0: Gently clicked search bar wrapper to expand UI.');
       } else {
         console.warn('[Naukri SpeedFill] Step 0: Search bar wrapper not found.');
       }
 
-      // ── STEP 1 - STEP 3: Delayed Execution (350ms for React mount) ─────────
+      // ── STEP 1 - STEP 3: Delayed Execution (600ms for React mount) ─────────
       setTimeout(() => {
         // Native React setter — bypasses React's synthetic state wrapper.
         const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
@@ -827,6 +827,7 @@
           return true;
         }
 
+        // ALL DOM queries strictly inside setTimeout after 600ms delay:
         // ── STEP 1: Inject Text Fields (Role & Location) ─────────────────────
         if (chosenRole) {
           const roleInput =
@@ -952,7 +953,7 @@
         setTimeout(() => { select.value = ''; }, 800);
 
         console.log(`[Naukri SpeedFill] Quick Search: Role="${chosenRole}" | Location="${chosenLocation}" | Exp="${chosenExperience}"`);
-      }, 350);
+      }, 600);
     });
 
     wrapper.appendChild(select);
