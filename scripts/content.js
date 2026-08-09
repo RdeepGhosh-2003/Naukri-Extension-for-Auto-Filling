@@ -907,8 +907,9 @@
                 if (expVal === '0') {
                   return text.includes('fresher');
                 } else {
-                  // Must include the year string, but CANNOT include "fresher"
-                  return text.includes(`${expVal} year`) && !text.includes('fresher');
+                  // Must include the target year, but CANNOT include "fresher" or "less than"
+                  // Using startsWith prevents '1 year' from matching '11 years' or '21 years'
+                  return text.startsWith(`${expVal} year`) && !text.includes('less than') && !text.includes('fresher');
                 }
               });
 
