@@ -844,8 +844,14 @@
       if (chosenExperience) {
         setTimeout(() => {
           const expInput = document.querySelector('input[placeholder*="experience" i]') ||
-                           document.querySelector('.experienceDD input') ||
-                           document.querySelector('#experienceInput');
+                           document.querySelector('.experienceDD input')                ||
+                           document.querySelector('.experienceDD')                      ||
+                           document.querySelector('#experienceDD')                      ||
+                           document.querySelector('.qsbExperience')                     ||
+                           document.querySelector('input[name="experience"]')            ||
+                           // Fallback: Find the dropdown wrapper between keyword and location
+                           document.querySelector('.nI-gNb-sb__wrapper > div:nth-child(2) input, .nI-gNb-sb__wrapper > div:nth-child(2)');
+
           if (expInput) {
             const expVal = String(chosenExperience).trim();
             let targetText = '';
@@ -858,7 +864,8 @@
             }
 
             // Value Check (Bypass if Match): If input already displays the target value, skip click and poll
-            const currentExpVal = (expInput.value || expInput.getAttribute('value') || expInput.parentElement?.textContent || '').toLowerCase();
+            const currentExpVal = (expInput.value || expInput.getAttribute('value') || expInput.textContent || expInput.parentElement?.textContent || '').toLowerCase();
+
             if (
               (expVal === '0' && currentExpVal.includes('fresher')) ||
               (expVal !== '0' && (currentExpVal.includes(`${expVal} year`) || currentExpVal.includes(`${expVal} yr`) || currentExpVal.includes(targetText)))
