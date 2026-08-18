@@ -3,6 +3,11 @@
  */
 
 document.addEventListener('DOMContentLoaded', () => {
+  const versionEl = document.getElementById('speedfill-version');
+  if (versionEl && chrome.runtime?.getManifest) {
+    versionEl.textContent = 'v' + chrome.runtime.getManifest().version;
+  }
+
   // Elements
   const tabBtns = document.querySelectorAll('.tab-btn');
   const tabPanes = document.querySelectorAll('.tab-pane');
