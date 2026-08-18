@@ -296,12 +296,6 @@
           console.log('[Naukri SpeedFill] Captcha notify error:', chrome.runtime.lastError.message);
         }
       });
-
-      const pill = document.getElementById('speedfill-floating-pill');
-      if (pill) {
-        pill.classList.add('pill-warning');
-        pill.innerHTML = `<span>🤖 CAPTCHA Verification Needed!</span>`;
-      }
     }
   }
 
@@ -470,28 +464,11 @@
 
     const appContainer = window.SpeedFillMatcher?.getAppContainer(document);
     const remainingUnmatched = checkUnmatchedUnfilledFields(appContainer);
-    updatePillStatus(remainingUnmatched, 0);
 
     if (remainingUnmatched === 0 && userProfile?.settings?.autoAdvanceStep !== false) {
       console.log('[Naukri SpeedFill] All missing fields completed by user! Auto-advancing step...');
       const delay = userProfile?.settings?.stepDelayMs || 500;
       setTimeout(() => clickContinueButton(appContainer), delay);
-    }
-  }
-
-  /**
-   * Update floating pill widget UI based on fill status & warnings
-   */
-  function updatePillStatus(unmatchedCount, filledCount) {
-    const pill = document.getElementById('speedfill-floating-pill');
-    if (!pill) return;
-
-    if (unmatchedCount > 0 && userProfile?.settings?.pauseOnUnmatchedFields !== false) {
-      pill.classList.add('pill-warning');
-      pill.innerHTML = `<span>⚠️ Review Needed (${unmatchedCount} Unfilled)</span>`;
-    } else {
-      pill.classList.remove('pill-warning');
-      pill.innerHTML = `<span>⚡ Naukri SpeedFill</span><span class="speedfill-badge">Alt + F</span>`;
     }
   }
 
@@ -775,12 +752,6 @@
             if (radioContainer) radioContainer.style.border = "2px solid #ff9800";
         }
 
-        const pill = document.getElementById('speedfill-floating-pill');
-        if (pill) {
-          pill.classList.add('pill-warning');
-          pill.innerHTML = `<span>🛑 Wait & Save: Manual Input Required</span>`;
-        }
-
         if (sendBtn && !sendBtn.dataset.speedfillIntercepted) {
           sendBtn.dataset.speedfillIntercepted = "true";
           sendBtn.addEventListener('click', function captureUserAnswer() {
@@ -803,7 +774,6 @@
 
               chrome.storage.local.set({ userProfile: userProfile }, () => {
                 if (chatInput) chatInput.style.border = "";
-                if (pill) { pill.classList.remove('pill-warning'); pill.innerHTML = `<span>💾 Answer Saved!</span>`; }
               });
             }
           }, { capture: true, once: true });
@@ -875,7 +845,6 @@
     attachInteractiveAutoAdvanceListeners(appContainer);
 
     const unmatchedCount = checkUnmatchedUnfilledFields(appContainer);
-    updatePillStatus(unmatchedCount, filledCount);
 
     const stepDelay = userProfile?.settings?.stepDelayMs !== undefined ? userProfile.settings.stepDelayMs : 150;
 
@@ -1335,68 +1304,6 @@
     textarea.parentNode.insertBefore(btn, textarea);
   }
 
-  /**
-   * Create floating widget pill on Naukri page
-   */
-  function createFloatingPill() {
-    if (document.getElementById('speedfill-floating-pill')) return;
-
-    const pill = document.createElement('div');
-    pill.id = 'speedfill-floating-pill';
-    pill.innerHTML = `
-      <span>⚡ Naukri SpeedFill</span>
-      <span class="speedfill-badge">Alt + F</span>
-    `;
-
-    pill.addEventListener('click', () => {
-      // STATE A: Main Job Page
-      const initialApplyBtn = Array.from(document.querySelectorAll('button, a, div[role="button"], [class*="apply-button"]')).find(b => {
-        const text = b.textContent.toLowerCase().trim();
-        const isVisible = b.offsetWidth > 0 && b.offsetHeight > 0;
-        const isSidebar = !!b.closest('.right-container, .sidebar, [class*="similar" i], [class*="recommend" i]');
-        return text === 'apply' && !b.disabled && isVisible && !isSidebar;
-      });
-
-      if (initialApplyBtn) {
-         console.log('[Naukri SpeedFill] State A: Clicking Apply and polling for modal...');
-         initialApplyBtn.click();
-         pill.innerHTML = `<span>⏳ Waiting for Bot...</span>`;
-
-         let attempts = 0;
-         const pollInterval = setInterval(() => {
-             attempts++;
-             const isModalRendered = !!document.querySelector('.chatbot-container, div[class*="chat" i], div[class*="modal" i]');
-
-             if (isModalRendered) {
-                 clearInterval(pollInterval);
-                 fillCurrentForm();
-                 pill.innerHTML = `<span>✅ SpeedFill Active</span>`;
-             } else if (attempts >= 25) { // Timeout after 5 seconds (25 * 200ms)
-                 clearInterval(pollInterval);
-                 console.warn('[Naukri SpeedFill] Chatbot modal did not appear after 5 seconds.');
-                 pill.innerHTML = `<span>⚠️ Modal Timeout</span>`;
-                 setTimeout(() => { pill.innerHTML = `<span>⚡ Naukri SpeedFill</span>`; }, 2500);
-             }
-         }, 200);
-         return; 
-      }
-
-      // STATE B: Modal Active
-      const appContainer = window.SpeedFillMatcher?.getAppContainer(document);
-      const submitted = clickSubmitButton(appContainer);
-      if (!submitted) {
-        handleResumeStep(appContainer);
-        fillCurrentForm();
-        clickContinueButton(appContainer);
-        pill.innerHTML = `<span>✅ SpeedFill Active</span>`;
-      } else {
-        pill.innerHTML = `<span>🚀 Submitted!</span>`;
-      }
-    });
-
-    document.body.appendChild(pill);
-  }
-
   // Listen for hotkey messages from background script
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'trigger_autofill') {
@@ -1412,7 +1319,6 @@
   // Initialization & Repeated Fill Retries for async React rendering
   loadProfile(() => {
     setupDOMObserver();
-    createFloatingPill();
 
     // Inject dropdown exactly ONCE via a safe deferred timeout.
     // This runs after the current call stack clears, ensuring the DOM
