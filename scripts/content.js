@@ -706,59 +706,79 @@
 
     forceHaltAutomation = false; // Reset at start of new form evaluation
 
-    // ── Chatbot UI Support & "Wait & Save" Mechanism ────────────────────────
-    const chatInput = document.querySelector('input[placeholder*="Type message here" i]') ||
-                      document.querySelector('input[placeholder*="type your answer" i]') ||
-                      document.querySelector('input[placeholder*="type here" i]') ||
-                      document.querySelector('.chat-input input') ||
-                      document.querySelector('[class*="chat" i] input[type="text"]');
+    // ── Chatbot UI Support & "Wait & Save" Mechanism (Upgraded for Radio Buttons) ──
+    const chatInput = document.querySelector('input[placeholder*="Type message here" i], input[placeholder*="type your answer" i], .chat-input input, [class*="chat" i] input[type="text"]');
+    const activeRadios = Array.from(document.querySelectorAll('input[type="radio"]')).filter(r => r.offsetWidth > 0 && r.offsetHeight > 0);
+    const isChatbotModal = !!document.querySelector('.chatbot-container, div[class*="chat" i], div[class*="modal" i]');
 
-    if (chatInput) {
+    if ((chatInput || activeRadios.length > 0) && isChatbotModal) {
       console.log('[Naukri SpeedFill] Chatbot UI detected on screen.');
+      
       let questionText = '';
       const messageElements = Array.from(document.querySelectorAll('[class*="chat" i] [class*="msg" i], [class*="chat" i] p, [class*="chat" i] span, [class*="question" i], .bot-msg, .chat-msg, div[class*="message" i]'))
         .filter(el => el.offsetWidth > 0 && el.offsetHeight > 0 && el.textContent.trim().length > 0);
 
+      const floatingLabel = document.querySelector('div[class*="modal"] label, div[class*="chat"] label, .title');
+
       if (messageElements.length > 0) {
         questionText = messageElements[messageElements.length - 1].textContent.toLowerCase().trim();
+      } else if (floatingLabel) {
+        questionText = floatingLabel.textContent.toLowerCase().trim();
       } else {
-        const container = chatInput.closest('[class*="chat" i], [class*="drawer" i], [class*="modal" i]') || document.body;
+        const container = (chatInput || activeRadios[0]).closest('[class*="chat" i], [class*="drawer" i], [class*="modal" i]') || document.body;
         questionText = container.textContent.toLowerCase().trim();
       }
 
-      console.log('[Naukri SpeedFill] Chatbot question detected:', questionText);
+      // Cleanup question string to avoid capturing dynamic names (like "Hi Rajdeep Ghosh...")
+      if (questionText.includes('kindly answer')) {
+          questionText = questionText.split('kindly answer')[1] || questionText;
+      }
+      questionText = questionText.trim();
 
-      // Search for answer in user profile, learnedAnswers, or screening Q&A bank
+      console.log('[Naukri SpeedFill] Chatbot question detected:', questionText);
       const answerValue = getAnswerForQuestion(questionText);
 
       const sendBtn = document.querySelector('button[class*="save" i], button[class*="send" i], .send-btn, .save-btn, [class*="sendBtn" i], [class*="saveBtn" i]') ||
-                      chatInput.parentElement?.querySelector('button') ||
-                      chatInput.closest('form, div[class*="chat" i], div[class*="drawer" i]')?.querySelector('button');
+                      (chatInput ? chatInput.parentElement?.querySelector('button') : null) ||
+                      document.querySelector('div[class*="modal" i] button, div[class*="drawer" i] button');
 
       let answerInjected = false;
 
       if (answerValue) {
-        // MATCH FOUND: Inject stored answer
-        chatInput.style.border = "";
-        chatInput.style.boxShadow = "";
-
-        const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
-          window.HTMLInputElement.prototype, 'value'
-        )?.set;
-
-        if (nativeInputValueSetter) {
-          chatInput.focus();
-          nativeInputValueSetter.call(chatInput, answerValue);
-          chatInput.dispatchEvent(new Event('input', { bubbles: true }));
-          chatInput.dispatchEvent(new Event('change', { bubbles: true }));
-          chatInput.classList.add('speedfill-highlight');
-          setTimeout(() => chatInput.classList.remove('speedfill-highlight'), 2000);
-          console.log(`[Naukri SpeedFill] Chatbot UI: Auto-injected known answer "${answerValue}" for question "${questionText}".`);
-          answerInjected = true;
+        // MATCH FOUND
+        if (chatInput) {
+            chatInput.style.border = "";
+            const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+            if (nativeInputValueSetter) {
+              chatInput.focus();
+              nativeInputValueSetter.call(chatInput, answerValue);
+              chatInput.dispatchEvent(new Event('input', { bubbles: true }));
+              chatInput.dispatchEvent(new Event('change', { bubbles: true }));
+              chatInput.classList.add('speedfill-highlight');
+              setTimeout(() => chatInput.classList.remove('speedfill-highlight'), 2000);
+              answerInjected = true;
+            }
+        } else if (activeRadios.length > 0) {
+            const targetRadio = activeRadios.find(r => {
+                const rText = getRadioText(r).toLowerCase();
+                return rText.includes(answerValue.toLowerCase()) || answerValue.toLowerCase().includes(rText);
+            });
+            if (targetRadio && !targetRadio.checked) {
+                targetRadio.click();
+                targetRadio.dispatchEvent(new Event('change', { bubbles: true }));
+                answerInjected = true;
+            } else if (targetRadio && targetRadio.checked) {
+                answerInjected = true; 
+            }
         }
-      } else {
-        // UNKNOWN QUESTION (Master Kill Switch Triggered):
-        // 1. Kill all lingering timers & intervals to prevent accidental auto-submits
+        
+        if (answerInjected) {
+            console.log(`[Naukri SpeedFill] Chatbot UI: Auto-injected known answer "${answerValue}".`);
+        }
+      } 
+      
+      if (!answerInjected) {
+        // UNKNOWN QUESTION (Master Kill Switch)
         forceHaltAutomation = true;
         clearTimeout(window._speedfillSubmitTimer);
         clearTimeout(window._speedfillAdvanceTimer);
@@ -767,42 +787,45 @@
           window._captchaMonitorInterval = null;
         }
 
-        console.warn('[Naukri SpeedFill] Master Kill Switch Triggered: Missing data detected. Aborting all auto-advance and auto-submit queues.');
+        console.warn('[Naukri SpeedFill] Master Kill Switch Triggered: Missing data detected.');
 
-        // 2. Highlight input box with orange warning border to signal manual input required
-        chatInput.style.border = "2px solid #ff9800";
-        chatInput.style.boxShadow = "0 0 10px rgba(255, 152, 0, 0.5)";
+        if (chatInput) {
+            chatInput.style.border = "2px solid #ff9800";
+        } else if (activeRadios.length > 0) {
+            const radioContainer = activeRadios[0].closest('fieldset, [role="radiogroup"], div[class*="radio"], form');
+            if (radioContainer) radioContainer.style.border = "2px solid #ff9800";
+        }
 
-        // 3. Update status pill
         const pill = document.getElementById('speedfill-floating-pill');
         if (pill) {
           pill.classList.add('pill-warning');
           pill.innerHTML = `<span>🛑 Wait & Save: Manual Input Required</span>`;
         }
 
-        // 4. Intercept & Capture when user clicks Save/Send button
         if (sendBtn && !sendBtn.dataset.speedfillIntercepted) {
           sendBtn.dataset.speedfillIntercepted = "true";
           sendBtn.addEventListener('click', function captureUserAnswer() {
-            const enteredVal = chatInput.value ? chatInput.value.trim() : '';
-            if (enteredVal && questionText) {
-              console.log(`[Naukri SpeedFill] Wait & Save: Capturing user answer "${enteredVal}" for question "${questionText}"`);
+            let enteredVal = '';
+            if (chatInput) {
+                enteredVal = chatInput.value ? chatInput.value.trim() : '';
+            } else if (activeRadios.length > 0) {
+                const checkedRadio = activeRadios.find(r => r.checked);
+                if (checkedRadio) enteredVal = getRadioText(checkedRadio);
+            }
 
+            if (enteredVal && questionText) {
+              console.log(`[Naukri SpeedFill] Wait & Save: Capturing "${enteredVal}" for "${questionText}"`);
               if (!userProfile.learnedAnswers) userProfile.learnedAnswers = {};
               userProfile.learnedAnswers[questionText] = enteredVal;
 
               if (!Array.isArray(userProfile.screening)) userProfile.screening = [];
               const existIdx = userProfile.screening.findIndex(s => s.keywords === questionText);
-              if (existIdx >= 0) {
-                userProfile.screening[existIdx].answer = enteredVal;
-              } else {
-                userProfile.screening.push({ keywords: questionText, answer: enteredVal });
-              }
+              if (existIdx >= 0) userProfile.screening[existIdx].answer = enteredVal;
+              else userProfile.screening.push({ keywords: questionText, answer: enteredVal });
 
               chrome.storage.local.set({ userProfile: userProfile }, () => {
-                console.log('[Naukri SpeedFill] Successfully saved learned Q&A pair to Chrome storage.');
-                chatInput.style.border = "";
-                chatInput.style.boxShadow = "";
+                console.log('[Naukri SpeedFill] Successfully saved learned Q&A pair.');
+                if (chatInput) chatInput.style.border = "";
                 if (pill) {
                   pill.classList.remove('pill-warning');
                   pill.innerHTML = `<span>💾 Answer Saved!</span>`;
@@ -811,14 +834,11 @@
             }
           }, { capture: true, once: true });
         }
-
-        console.warn(`[Naukri SpeedFill] Unknown question detected ("${questionText}"). Halting automation for manual input.`);
-        return 0; // CRITICAL: Force exit the function entirely right here
+        return 0; 
       }
 
-      // ONLY execute click if the guard clause was passed and answer was successfully injected
       if (answerInjected && sendBtn && !forceHaltAutomation) {
-        console.log('[Naukri SpeedFill] Chatbot UI: Answer injected, auto-clicking Send/Save button with 500ms human delay...');
+        console.log('[Naukri SpeedFill] Auto-clicking Send/Save button...');
         setTimeout(() => sendBtn.click(), 500);
         return 1;
       }
@@ -1357,11 +1377,32 @@
     `;
 
     pill.addEventListener('click', () => {
+      // STATE A: Main Job Page - Look for initial "Apply" button
+      const initialApplyBtn = Array.from(document.querySelectorAll('button, a.apply-button')).find(b => {
+        const text = b.textContent.toLowerCase().trim();
+        // Specifically matching "apply", avoiding "apply on company site" for now based on user preference
+        return text === 'apply' && !b.disabled;
+      });
+
+      if (initialApplyBtn) {
+         console.log('[Naukri SpeedFill] State A: Main Apply button found. Clicking and waiting for modal...');
+         initialApplyBtn.click();
+         pill.innerHTML = `<span>⏳ Waiting for Bot...</span>`;
+         
+         // Wait for Chatbot modal to render, then enter State B
+         setTimeout(() => {
+           fillCurrentForm();
+           pill.innerHTML = `<span>✅ SpeedFill Active</span>`;
+         }, 1500);
+         return; 
+      }
+
+      // STATE B: Standard Form or Chatbot Modal currently active
       const appContainer = window.SpeedFillMatcher?.getAppContainer(document);
       const submitted = clickSubmitButton(appContainer);
       if (!submitted) {
         handleResumeStep(appContainer);
-        const count = fillCurrentForm();
+        fillCurrentForm();
         clickContinueButton(appContainer);
         pill.innerHTML = `<span>✅ SpeedFill Active</span>`;
       } else {
