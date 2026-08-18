@@ -223,10 +223,66 @@ document.addEventListener('DOMContentLoaded', () => {
     // Q&A Bank
     renderQaCards(profile.screening || []);
 
+    // Learned Bot Answers
+    renderLearnedAnswers(profile);
+
     // Saved Quick Searches — render dynamic blocks
     renderSearchBlocks(
       Array.isArray(profile.savedSearches) ? profile.savedSearches : []
     );
+  }
+
+  /**
+   * Render dynamically learned Chatbot questions & answers UI section
+   */
+  function renderLearnedAnswers(profile) {
+    const container = document.getElementById('learned-qa-list');
+    if (!container) return;
+    container.innerHTML = ''; // Clear existing
+
+    const screeningData = profile?.screening || [];
+
+    if (screeningData.length === 0) {
+      container.innerHTML = '<div style="color: #64748b; font-size: 12px; font-style: italic;">No questions learned yet.</div>';
+      return;
+    }
+
+    screeningData.forEach((item, index) => {
+      // Skip if it doesn't have dynamically learned keywords
+      if (!item || !item.keywords || !item.answer) return;
+
+      const card = document.createElement('div');
+      card.style.cssText = 'background: #1e293b; padding: 8px; border-radius: 6px; position: relative; border: 1px solid #334155;';
+
+      card.innerHTML = `
+        <div style="font-size: 11px; color: #cbd5e1; margin-bottom: 4px; padding-right: 20px;"><strong>Q:</strong> ${item.keywords}</div>
+        <div style="font-size: 12px; color: #10b981;"><strong>A:</strong> ${item.answer}</div>
+        <button class="delete-qa-btn" data-index="${index}" title="Delete this answer" style="position: absolute; top: 6px; right: 6px; background: transparent; border: none; cursor: pointer; color: #ef4444; font-size: 14px;">×</button>
+      `;
+      container.appendChild(card);
+    });
+
+    // Attach delete listeners
+    document.querySelectorAll('#learned-qa-list .delete-qa-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const idx = parseInt(e.target.getAttribute('data-index'));
+        const item = currentProfile?.screening?.[idx];
+        if (item && item.keywords) {
+          const keywordToRemove = item.keywords;
+          if (currentProfile.learnedAnswers && currentProfile.learnedAnswers[keywordToRemove]) {
+            delete currentProfile.learnedAnswers[keywordToRemove];
+          }
+        }
+        if (currentProfile?.screening) {
+          currentProfile.screening.splice(idx, 1);
+        }
+
+        chrome.storage.local.set({ userProfile: currentProfile }, () => {
+          renderLearnedAnswers(currentProfile); // Re-render instantly
+          renderQaCards(currentProfile.screening || []); // Sync Q&A tab list
+        });
+      });
+    });
   }
 
   /**
