@@ -752,9 +752,19 @@
             if (radioContainer) radioContainer.style.border = "2px solid #ff9800";
         }
 
-        if (sendBtn && !sendBtn.dataset.speedfillIntercepted) {
-          sendBtn.dataset.speedfillIntercepted = "true";
-          sendBtn.addEventListener('click', function captureUserAnswer() {
+    // ── Smart UI Save Button Injection ──
+    const inputContainer = chatInput ? chatInput.parentElement : (activeRadios.length > 0 ? activeRadios[0].closest('fieldset, [role="radiogroup"], div[class*="radio"], form') : null);
+
+    if (inputContainer && !document.getElementById('smart-save-btn')) {
+        const smartBtn = document.createElement('button');
+        smartBtn.id = 'smart-save-btn';
+        smartBtn.className = 'speedfill-smart-btn';
+        smartBtn.innerHTML = '💾 Learn this Answer';
+
+        smartBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+
             let enteredVal = '';
             if (chatInput) enteredVal = chatInput.value ? chatInput.value.trim() : '';
             else if (activeRadios.length > 0) {
@@ -762,22 +772,38 @@
                 if (checkedRadio) enteredVal = getRadioText(checkedRadio, document);
             }
 
-            if (enteredVal && questionText) {
-              if (!userProfile.learnedAnswers) userProfile.learnedAnswers = {};
-              userProfile.learnedAnswers[questionText] = enteredVal;
-
-              if (!Array.isArray(userProfile.screening)) userProfile.screening = [];
-              const existIdx = userProfile.screening.findIndex(s => s.keywords === questionText);
-              // Strict Deduplication: Update if exists, Push if new
-              if (existIdx >= 0) userProfile.screening[existIdx].answer = enteredVal;
-              else userProfile.screening.push({ keywords: questionText, answer: enteredVal });
-
-              chrome.storage.local.set({ userProfile: userProfile }, () => {
-                if (chatInput) chatInput.style.border = "";
-              });
+            if (!enteredVal) {
+                smartBtn.innerHTML = '❌ Select or Type an Answer First!';
+                smartBtn.style.background = '#ef4444';
+                setTimeout(() => { smartBtn.innerHTML = '💾 Learn this Answer'; smartBtn.style.background = '#10b981'; }, 2000);
+                return;
             }
-          }, { capture: true, once: true });
-        }
+
+            if (enteredVal && questionText) {
+                console.log(`[Naukri SpeedFill] Smart Save: Capturing "${enteredVal}" for "${questionText}"`);
+                if (!userProfile.learnedAnswers) userProfile.learnedAnswers = {};
+                userProfile.learnedAnswers[questionText] = enteredVal;
+
+                if (!Array.isArray(userProfile.screening)) userProfile.screening = [];
+                const existIdx = userProfile.screening.findIndex(s => s.keywords === questionText);
+                if (existIdx >= 0) userProfile.screening[existIdx].answer = enteredVal;
+                else userProfile.screening.push({ keywords: questionText, answer: enteredVal });
+
+                chrome.storage.local.set({ userProfile: userProfile }, () => {
+                    smartBtn.innerHTML = '✅ Saved! Auto-advancing...';
+                    smartBtn.classList.add('saved');
+                    if (chatInput) chatInput.style.border = "";
+                    if (activeRadios.length > 0) inputContainer.style.border = "";
+
+                    // Auto-click Naukri's native Save button to advance the form smoothly
+                    if (sendBtn) setTimeout(() => sendBtn.click(), 400);
+                });
+            }
+        });
+
+        // Insert the smart button directly above the input container
+        inputContainer.parentNode.insertBefore(smartBtn, inputContainer);
+    }
         return 0; 
       }
 
