@@ -1351,19 +1351,33 @@
     pill.addEventListener('click', () => {
       // STATE A: Main Job Page
       const initialApplyBtn = Array.from(document.querySelectorAll('button, a, div[role="button"], [class*="apply-button"]')).find(b => {
-          const text = b.textContent.toLowerCase().trim();
-          const isVisible = b.offsetWidth > 0 && b.offsetHeight > 0;
-          return text === 'apply' && !b.disabled && isVisible;
+        const text = b.textContent.toLowerCase().trim();
+        const isVisible = b.offsetWidth > 0 && b.offsetHeight > 0;
+        const isSidebar = !!b.closest('.right-container, .sidebar, [class*="similar" i], [class*="recommend" i]');
+        return text === 'apply' && !b.disabled && isVisible && !isSidebar;
       });
 
       if (initialApplyBtn) {
-         console.log('[Naukri SpeedFill] State A: Clicking Apply and waiting for modal...');
+         console.log('[Naukri SpeedFill] State A: Clicking Apply and polling for modal...');
          initialApplyBtn.click();
          pill.innerHTML = `<span>⏳ Waiting for Bot...</span>`;
-         setTimeout(() => {
-           fillCurrentForm();
-           pill.innerHTML = `<span>✅ SpeedFill Active</span>`;
-         }, 1500);
+
+         let attempts = 0;
+         const pollInterval = setInterval(() => {
+             attempts++;
+             const isModalRendered = !!document.querySelector('.chatbot-container, div[class*="chat" i], div[class*="modal" i]');
+
+             if (isModalRendered) {
+                 clearInterval(pollInterval);
+                 fillCurrentForm();
+                 pill.innerHTML = `<span>✅ SpeedFill Active</span>`;
+             } else if (attempts >= 25) { // Timeout after 5 seconds (25 * 200ms)
+                 clearInterval(pollInterval);
+                 console.warn('[Naukri SpeedFill] Chatbot modal did not appear after 5 seconds.');
+                 pill.innerHTML = `<span>⚠️ Modal Timeout</span>`;
+                 setTimeout(() => { pill.innerHTML = `<span>⚡ Naukri SpeedFill</span>`; }, 2500);
+             }
+         }, 200);
          return; 
       }
 
