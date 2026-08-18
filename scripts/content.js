@@ -1350,8 +1350,10 @@
 
     pill.addEventListener('click', () => {
       // STATE A: Main Job Page
-      const initialApplyBtn = Array.from(document.querySelectorAll('button, a.apply-button')).find(b => {
-        return b.textContent.toLowerCase().trim() === 'apply' && !b.disabled;
+      const initialApplyBtn = Array.from(document.querySelectorAll('button, a, div[role="button"], [class*="apply-button"]')).find(b => {
+          const text = b.textContent.toLowerCase().trim();
+          const isVisible = b.offsetWidth > 0 && b.offsetHeight > 0;
+          return text === 'apply' && !b.disabled && isVisible;
       });
 
       if (initialApplyBtn) {
